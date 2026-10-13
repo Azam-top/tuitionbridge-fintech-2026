@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TuitionBridge evidence (REPLAY)</title>
+<style>
+  :root { --ink:#12222e; --muted:#5b6b77; --line:#d6dee4; --bg:#f4f7f9; --card:#fff; --teal:#0b7a75; --teal-l:#dff3f1; --red:#a12a2a; --red-l:#fde8e8; --ok:#1b6b3a; --ok-l:#e3f5ea; --violet:#4b3a8a; --violet-l:#ece8fb; --amber:#8a5a00; --amber-l:#fff1d6; }
+  * { box-sizing: border-box; } body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  .banner { background:var(--violet); color:#fff; padding:10px 16px; font-weight:600; }
+  .banner small { font-weight:400; opacity:.9; display:block; }
+  main { max-width:1100px; margin:0 auto; padding:16px; }
+  h1 { margin:.2rem 0 .4rem; font-size:1.4rem; } h2 { font-size:1.05rem; margin:0 0 8px; } h3 { font-size:.95rem; margin:12px 0 4px; }
+  .badges span { display:inline-block; margin:0 6px 6px 0; padding:2px 10px; border-radius:999px; font-size:.8rem; border:1px solid; }
+  .b-violet { background:var(--violet-l); color:var(--violet); border-color:#cbc2ef; } .b-amber { background:var(--amber-l); color:var(--amber); border-color:#efce86; }
+  .b-ink { background:#e4ebf0; border-color:#bccad4; }
+  nav { display:flex; gap:6px; flex-wrap:wrap; margin:12px 0; } nav button { font:inherit; padding:7px 14px; border:1px solid #b5c3cd; background:#fff; border-radius:8px; cursor:pointer; }
+  nav button[aria-selected="true"] { background:var(--teal); color:#fff; border-color:#095f5b; }
+  :focus-visible { outline:3px solid #1c9a93; outline-offset:2px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px 16px; margin-bottom:14px; overflow-x:auto; }
+  table { border-collapse:collapse; width:100%; font-size:.88rem; } th,td { text-align:left; padding:6px 8px; border-bottom:1px solid #e6ecf0; vertical-align:top; } th { color:var(--muted); font-size:.8rem; }
+  code,pre { font-family:ui-monospace,Menlo,monospace; font-size:.82rem; } pre { background:#0f1c26; color:#d6e6ef; padding:10px; border-radius:8px; overflow:auto; max-height:320px; }
+  .pass { color:var(--ok); font-weight:700; } .fail { color:var(--red); font-weight:700; }
+  .kv { display:grid; grid-template-columns:minmax(150px,32%) 1fr; gap:4px 12px; } .kv div:nth-child(odd){ color:var(--muted); }
+  details { margin:4px 0; } summary { cursor:pointer; color:var(--teal); }
+  .note { background:var(--amber-l); border:1px solid #efce86; border-radius:8px; padding:8px 12px; margin:8px 0; }
+  @media print { nav { display:none; } section[hidden] { display:block !important; } .banner { -webkit-print-color-adjust:exact; print-color-adjust:exact; } }
+</style>
+</head>
+<body>
+<div class="banner" role="note">REPLAY: offline record of runs of this codebase. This is not a live session.
+  <small>Agent mode when recorded: <strong>MOCK</strong> (no model key) · Payments: <strong>SIMULATED</strong> · Data: fictional.</small></div>
+<main>
+  <h1>TuitionBridge evidence viewer</h1>
+  <div class="badges" id="badges"></div>
+  <nav role="tablist" aria-label="Evidence sections" id="tabs"></nav>
+  <div id="panels"></div>
+</main>
+<script>
+const D = /*__DATA__*/null;
+const $ = (s, r = document) => r.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const usd = (c) => { const v = BigInt(c); const n = v < 0n; const a = n ? -v : v; return `${n ? "-" : ""}USD ${(a/100n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}.${(a%100n).toString().padStart(2,"0")}`; };
+const kzt = (c) => usd(c).replace("USD", "KZT");
+const money = (a) => a.currency === "USD" ? usd(a.balance) : kzt(a.balance);
+const kv = (o) => `<div class="kv">${Object.entries(o).map(([k, v]) => `<div>${esc(k)}</div><div>${v}</div>`).join("")}</div>`;
+const json = (v) => `<details><summary>Show JSON</summary><pre>${esc(JSON.stringify(v, null, 2))}</pre></details>`;
+
+function ledgerTable(before, after, label) {
+  const rows = before.accounts.map((a, i) => { const b = after.accounts[i]; return `<tr><td><code>${esc(a.id)}</code></td><td>${esc(a.kind)}</td><td>${money(a)}</td><td>${money(b)}</td><td>${a.balance === b.balance ? "unchanged" : "<strong>changed</strong>"}</td></tr>`; }).join("");
+  return `<h3>${esc(label)}</h3><table><thead><tr><th>Account</th><th>Kind</th><th>Before</th><th>After</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+    <p>Payments recorded: ${before.paymentCount} → ${after.paymentCount}; ledger entries: ${before.entryCount} → ${after.entryCount}</p>`;
+}
+function trace(ev) {
+  return `<table><thead><tr><th>#</th><th>Kind</th><th>Tool / text</th><th>Result</th></tr></thead><tbody>${ev.map((e) =>
+    `<tr><td>${e.seq}</td><td>${esc(e.kind)}</td><td>${e.tool ? `<code>${esc(e.tool)}</code>` : esc(e.text)}</td><td>${e.kind === "tool" ? (e.ok ? '<span class="pass">ok</span>' : '<span class="fail">rejected: ' + esc(e.output?.error?.code) + "</span>") : ""}${e.kind === "tool" ? json({ input: e.input, output: e.output }) : ""}</td></tr>`).join("")}</tbody></table>`;
+}
+function success() {
+  const s = D.success, p = s.proposal.payload, r = s.receipt;
+  return `<div class="card"><h2>Successful payment</h2><p>${esc(s.description)}</p>
+    ${kv({ "Task state": esc(s.task.state), "Agent mode": esc(s.task.mode) + " (token usage not reported)", "Instruction": esc(s.task.instruction),
+      "Tool calls / model requests": `${s.task.usage.toolCalls} / ${s.task.usage.modelRequests}` })}</div>
+    <div class="card"><h2>Tool-call trace</h2>${trace(s.toolTrace)}</div>
+    <div class="card"><h2>Proposal and human approval</h2>${kv({ "Proposal": `<code>${esc(s.proposal.id)}</code>`, "SHA-256 fingerprint": `<code>${esc(s.proposal.hash)}</code>`,
+      "Recipient will receive": kzt(p.recipientTiyn), "Total debit": usd(p.totalDebitCents), "Reserve kept": usd(p.reserveCents),
+      "Approval record": s.humanApproval ? `<code>${esc(s.humanApproval.id)}</code> at ${esc(s.humanApproval.approvedAt)} (consumed ${esc(s.humanApproval.consumedAt)})` : "none" })}
+      <p class="note">In this export the approval call stands in for the student's click; in the app it is only reachable through the authenticated approval endpoint.</p>${json(s.proposal)}</div>
+    <div class="card"><h2>Ledger before / after</h2>${ledgerTable(s.ledger.before, s.ledger.after, "All accounts (USD and KZT are never summed)")}
+      <p>At the approval pause, before any money moved: payments = ${s.ledger.atApprovalPause.paymentCount}, entries = ${s.ledger.atApprovalPause.entryCount}.</p>${json(s.ledgerEntries)}</div>
+    <div class="card"><h2>Receipt (SIMULATED)</h2><p>${esc(r.disclaimer)}</p>${kv({ "Payment": `<code>${esc(r.paymentId)}</code>`, "Debited": usd(r.totalDebitCents), "Credited to university": kzt(r.recipientTiynCredited), "Rounding surplus": kzt(r.surplusTiyn), "Balance before → after": `${usd(r.usdBalanceBeforeCents)} → ${usd(r.usdBalanceAfterCents)}` })}${json(r)}</div>
+    <div class="card"><h2>Audit log (redacted structured fields)</h2>${json(s.audit)}</div>`;
+}
+function malicious() {
+  const m = D.malicious, a = m.mockAgentRun, o = m.scriptedObedientModelRun;
+  return `<div class="card"><h2>Rejected malicious invoice</h2><p>${esc(m.description)}</p>
+    <h3>Injected invoice text (untrusted)</h3><pre>${esc(m.injectedNotes)}</pre>
+    ${kv({ "Payment ledger unchanged": m.paymentLedgerUnchanged ? '<span class="pass">yes</span>' : '<span class="fail">NO</span>', "Beneficiary in proposal": `<code>${esc(a.proposalBeneficiaryAccount)}</code> (trusted registry value)`,
+      "Forged execute with an invoice-claimed approval": esc(a.forgedExecuteAttempt.result) })}</div>
+    <div class="card"><h2>MOCK agent trace on the malicious invoice</h2>${trace(a.toolTrace)}</div>
+    <div class="card"><h2>SCRIPTED model that obeys the injection</h2><p class="note">${esc(o.label)}</p>${trace(o.toolTrace)}<p>Final task state: <strong>${esc(o.task.state)}</strong></p></div>
+    <div class="card"><h2>Ledger</h2>${ledgerTable(m.ledger.before, m.ledger.after, "MOCK agent run")}${ledgerTable(m.ledger.before, m.ledger.afterScriptedRun, "Scripted obedient-model run")}</div>`;
+}
+function evalPanel(rep, title) {
+  if (!rep) return `<div class="card"><h2>${esc(title)}</h2><p class="note">Not run. A real-model evaluation needs a configured key and was not performed for this bundle.</p></div>`;
+  const cats = Object.entries(rep.byCategory).map(([k, v]) => `<tr><td>${esc(k)}</td><td>${v.passed}/${v.total}</td></tr>`).join("");
+  const rows = rep.cases.map((c) => `<tr><td><code>${esc(c.id)}</code>${c.critical ? " ★" : ""}</td><td>${esc(c.category)}</td><td>${esc(c.title)}</td><td class="${c.passed ? "pass" : "fail"}">${c.passed ? "pass" : "FAIL"}</td></tr>`).join("");
+  return `<div class="card"><h2>${esc(title)}</h2><p>${esc(rep.label)}</p>
+    ${kv({ "Passed": `<strong>${rep.passed}/${rep.denominator}</strong>`, "Critical gates (★)": `${rep.criticalGates.passed}/${rep.criticalGates.total}`, "Unauthorized successful payments": String(rep.unauthorizedSuccessfulPayments),
+      "Failed cases": rep.failed.length ? esc(rep.failed.join(", ")) : "none", "Environment": esc(`${rep.environment.agentMode} agent, Node ${rep.environment.node}, commit ${rep.environment.gitHead}`), "Generated": esc(rep.generatedAt),
+      "Usage": esc(rep.usage.note || JSON.stringify(rep.usage)) })}
+    <p class="note">Targets (≥27/30, all critical gates, zero unauthorized payments) are project targets, not official judging thresholds.</p>
+    <h3>By category</h3><table><tbody>${cats}</tbody></table><h3>Cases</h3><table><thead><tr><th>ID</th><th>Category</th><th>Case</th><th>Result</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+function manifestPanel() {
+  const m = D.manifest;
+  return `<div class="card"><h2>Manifest</h2>${kv({ "Generated": esc(m.generatedAt), "Commit": esc(m.gitHead), "Node": esc(m.node), "Agent": esc(m.labels.agentMode), "Payments": esc(m.labels.payments), "Live model verified": m.labels.liveModelVerified ? "yes" : "<strong>no</strong>", "Redaction": esc(m.redaction) })}
+    <table><thead><tr><th>File</th><th>SHA-256</th></tr></thead><tbody>${m.files.map((f) => `<tr><td>${esc(f.file)}</td><td><code>${esc(f.sha256)}</code></td></tr>`).join("")}</tbody></table></div>`;
+}
+const TABS = [["Successful payment", success], ["Rejected malicious invoice", malicious], ["Evaluation (deterministic)", () => evalPanel(D.evalMock, "Evaluation: deterministic / MOCK")], ["Evaluation (real model)", () => evalPanel(D.evalLive, "Evaluation: real model")], ["Manifest", manifestPanel]];
+$("#badges").innerHTML = '<span class="b-violet">REPLAY: offline record</span><span class="b-amber">AGENT: MOCK</span><span class="b-ink">PAYMENTS: SIMULATED</span><span class="b-amber">LIVE MODEL: NOT VERIFIED</span>';
+const tabs = $("#tabs"), panels = $("#panels");
+TABS.forEach(([name, fn], i) => {
+  const b = document.createElement("button"); b.role = "tab"; b.textContent = name; b.id = "t" + i; b.setAttribute("aria-controls", "p" + i); tabs.append(b);
+  const s = document.createElement("section"); s.id = "p" + i; s.role = "tabpanel"; s.setAttribute("aria-labelledby", "t" + i); s.innerHTML = fn(); panels.append(s);
+  b.onclick = () => select(i);
+});
+function select(i) { [...tabs.children].forEach((b, j) => { b.setAttribute("aria-selected", String(i === j)); panels.children[j].hidden = i !== j; }); }
+select(0);
+</script>
+</body>
+</html>

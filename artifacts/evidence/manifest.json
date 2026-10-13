@@ -1,0 +1,31 @@
+{
+  "kind": "TuitionBridge evidence bundle",
+  "generatedAt": "2026-10-12T05:28:34.541Z",
+  "gitHead": "f45121e",
+  "node": "v26.11.1",
+  "labels": {
+    "agentMode": "MOCK (no model key configured for these runs)",
+    "payments": "SIMULATED",
+    "viewer": "REPLAY (offline record of the runs below)",
+    "liveModelVerified": false
+  },
+  "redaction": "Contains no credentials, session/CSRF tokens, password hashes or API keys. All names, accounts and amounts are fictional. Token usage/cost are not reported for MOCK runs.",
+  "files": [
+    {
+      "file": "eval-mock.json",
+      "sha256": "414ba21bdde5f7cc790133714e41eca0684cf302a22046ae70fc32385db2ccf6"
+    },
+    {
+      "file": "malicious-case.json",
+      "sha256": "13246a7d405d4860d3f8f72cb31962781d9aa1862e159688f7b07b3c8156f957"
+    },
+    {
+      "file": "success-run.json",
+      "sha256": "fc15ae0bc22310c1120d125f3afa5d05cf0effab621db08c6719a3c10599b57f"
+    },
+    {
+      "file": "test-summary.json",
+      "sha256": "0afc77dec0014d8e7d7099b9bb2373381890e9a879b57a4671e48b015c06785a"
+    }
+  ]
+}
