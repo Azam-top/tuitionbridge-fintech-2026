@@ -1,0 +1,14 @@
+node_modules
+dist
+data/*.sqlite*
+.env
+.env.*
+!.env.example
+test-results
+playwright-report
+artifacts/tmp
+*.log
+data/test-*
+data/e2e.sqlite*
+.vitest
+dist-submission
