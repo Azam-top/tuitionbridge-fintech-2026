@@ -140,3 +140,32 @@ export function copyInto(src: string, outDir: string, name: string): void {
   mkdirSync(outDir, { recursive: true });
   copyFileSync(src, join(outDir, name));
 }
+
+export interface EvidenceBundle {
+  manifest: { sourceCommit?: string | null; sourceDirty?: boolean };
+  testSummary: { sourceCommit?: string | null; sourceDirty?: boolean; typecheck?: string; unitAndIntegration?: { failed?: number }; browser?: { failed?: number } };
+  evalMock: { provenance?: { sourceCommit?: string | null; sourceDirty?: boolean }; gate?: { ok?: boolean } };
+}
+
+/**
+ * Returns the reasons a set of artifacts cannot be traced to one clean source commit (empty list = consistent).
+ * Artifacts may be committed later than the sources they describe; sources must not have changed in between.
+ */
+export function checkEvidenceConsistency(b: EvidenceBundle, changedSince: (commit: string) => string[] = sourceChangedSince): string[] {
+  const why: string[] = [];
+  const commits = {
+    "evidence manifest": b.manifest.sourceCommit, "test summary": b.testSummary.sourceCommit, "evaluation report": b.evalMock.provenance?.sourceCommit,
+  };
+  for (const [k, v] of Object.entries(commits)) if (!v) why.push(`${k} records no source commit`);
+  const distinct = new Set(Object.values(commits).filter(Boolean));
+  if (distinct.size > 1) why.push(`artifacts come from different source commits (${[...distinct].map((c) => String(c).slice(0, 7)).join(", ")})`);
+  if (b.manifest.sourceDirty || b.testSummary.sourceDirty || b.evalMock.provenance?.sourceDirty) why.push("an artifact was generated from a dirty source tree");
+  if (b.testSummary.typecheck !== "pass" || b.testSummary.unitAndIntegration?.failed !== 0 || b.testSummary.browser?.failed !== 0) why.push("the test summary records a failure");
+  if (b.evalMock.gate?.ok !== true) why.push("the evaluation gate did not pass");
+  const commit = [...distinct][0];
+  if (commit) {
+    const changed = changedSince(String(commit));
+    if (changed.length) why.push(`source changed after the artifacts were generated (${changed.slice(0, 3).join(", ")}${changed.length > 3 ? ", ..." : ""})`);
+  }
+  return why;
+}

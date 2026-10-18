@@ -4,7 +4,7 @@ import { mkdtempSync, writeFileSync, existsSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
-import { assessLiveReport, assessMockReport, runMandatoryEval } from "../scripts/lib/provenance";
+import { assessLiveReport, assessMockReport, checkEvidenceConsistency, runMandatoryEval } from "../scripts/lib/provenance";
 
 const noChange = () => [] as string[];
 const goodLive = () => ({
@@ -100,4 +100,29 @@ describe("fake-provider report cannot become a deck claim", () => {
     expect(a.status).toBe("NOT_VERIFIED");
     writeFileSync(join(dir, "note.txt"), a.summary);
   }, 60_000);
+});
+
+describe("package provenance consistency", () => {
+  const C = "c".repeat(40);
+  const good = () => ({
+    manifest: { sourceCommit: C, sourceDirty: false },
+    testSummary: { sourceCommit: C, sourceDirty: false, typecheck: "pass", unitAndIntegration: { failed: 0 }, browser: { failed: 0 } },
+    evalMock: { provenance: { sourceCommit: C, sourceDirty: false }, gate: { ok: true } },
+  });
+  it("accepts artifacts from one clean commit with unchanged sources", () => {
+    expect(checkEvidenceConsistency(good(), noChange)).toEqual([]);
+  });
+  it("rejects mixed commits, dirty trees, failures, a failed gate and later source changes", () => {
+    const mixed = good(); mixed.testSummary.sourceCommit = "d".repeat(40);
+    expect(checkEvidenceConsistency(mixed, noChange).join(" ")).toMatch(/different source commits/);
+    const dirty = good(); dirty.manifest.sourceDirty = true;
+    expect(checkEvidenceConsistency(dirty, noChange).join(" ")).toMatch(/dirty/);
+    const failed = good(); failed.testSummary.browser.failed = 1;
+    expect(checkEvidenceConsistency(failed, noChange).join(" ")).toMatch(/failure/);
+    const gate = good(); gate.evalMock.gate.ok = false;
+    expect(checkEvidenceConsistency(gate, noChange).join(" ")).toMatch(/gate/);
+    expect(checkEvidenceConsistency(good(), () => ["src/server/agent/runner.ts"]).join(" ")).toMatch(/source changed/);
+    const none = good(); (none.manifest as { sourceCommit: string | null }).sourceCommit = null;
+    expect(checkEvidenceConsistency(none, noChange).join(" ")).toMatch(/records no source commit/);
+  });
 });
