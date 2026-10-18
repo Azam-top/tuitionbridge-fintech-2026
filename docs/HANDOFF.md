@@ -18,6 +18,16 @@ README.md · docs/{ARCHITECTURE,SECURITY,PROJECT_SPEC,DEMO_SCRIPT,PITCH_QA,DEPEN
 ## Decisions
 UI: guided demo (4 scenarios + more datasets), stepper, friendly errors, approval card focus. Login rate limit configurable (`APP_LOGIN_RATE_LIMIT`; e2e raises it). Deck numbers come from measured files and the policy code. Evidence = real runs read back from the DB (MOCK), plus a labeled REPLAY viewer.
 
+## Stage 1 hardening (audit findings F1-F7, 2026-10-18; uncommitted)
+- F1 `prepareProposal` re-ranks the latest quote set and rejects non-best (`ROUTE_NOT_OPTIMAL`) or superseded (`QUOTE_SUPERSEDED`) quotes; ranking evidence is in the hashed payload (`selection`).
+- F2 task transitions are compare-and-set; every await re-checks ownership, so a late model response after cancel is discarded.
+- F3 summaries come from stored proposal/receipt/tool results (`agent/outcome.ts`); model prose is shown only if `agent/grounding.ts` finds no unsupported amount, payment/approval claim or route claim, else an `assistant_withheld` event.
+- F4 after the execute phase the ledger decides: a payment row => COMPLETED, even if the explanation call failed.
+- F5 reserve parser collects all mentions: non-USD currency or differing amounts => INTENT_CONFLICT.
+- F6 `scripts/eval/gate.ts`: live/mock exit code is a real gate; `--report-only` is the explicit observational mode; `--max-cases` is bounded 1-30. Optional `APP_LLM_BASE_URL` points the adapter at a local fake provider (tests only).
+- F7 demo KZT balance is 0 (USD-only scenario).
+- New tests: `tests/hardening.test.ts`, `tests/eval-gate.test.ts`. Evidence/deck/demo are NOT yet regenerated for this change.
+
 ## Remaining human blockers (details in SUBMISSION_CHECKLIST.md)
 1. **LIVE model never run**: set key+model in `.env`, `npm run smoke:live`, then the bounded live eval; re-export evidence/deck.
 2. No student interviews (deck slides 2 and 10 have TODOs).
