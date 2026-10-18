@@ -1,10 +1,10 @@
 # TuitionBridge: project spec (Session 1 contract)
 
 Competition prototype for Topic C, 2026 Shenzhen International FinTech Competition, International Track.
-All data is fictional. All payments are SIMULATED in a local sandbox ledger.
+Two modes. LIVE (default): real accounts, real invoice, a required real model, sources named per number; the app moves NO money and issues a payment instruction. SANDBOX: a separate stamped database of fictional TEST DATA with a MOCK agent and a SIMULATED ledger, used for the competition check and the 30 evaluation cases.
 
 ## Task
-Confirmed invoice -> balances -> three sandbox USD->KZT quotes -> feasible route -> immutable proposal -> explicit human approval -> agent-executed sandbox payment -> receipt + redacted evidence.
+Confirmed invoice -> declared funds -> sourced USD->KZT offers (Wise public quote API, user-entered offers, NBK reference rate) -> server-ranked feasible route -> immutable proposal -> explicit human approval -> payment instruction (live) or sandbox ledger execution (sandbox) -> user evidence / receipt + audit log.
 
 ## Competition facts (from the organizer brief; not scoring promises)
 - International Track rubric: task completion 40%, security/compliance 30%, innovation/interaction 30%.

@@ -12,6 +12,7 @@ import { resetDemo } from "../src/server/services/seed";
 import { createRunner } from "../src/server/agent/runner";
 import { MockLlm } from "../src/server/agent/mock-llm";
 import { buildApp } from "../src/server/http/app";
+import { createLlm } from "../src/server/agent/factory";
 import { readFileSync } from "node:fs";
 import { assessLiveReport } from "./lib/provenance";
 
@@ -28,6 +29,21 @@ resetDemo(ctx);
 const llm = new MockLlm();
 const app = buildApp({ ctx, runner: createRunner(ctx, llm), llm });
 await app.listen({ host: "127.0.0.1", port: PORT });
+
+// ---- the LIVE-mode app, in process, on its own in-memory database ----
+// The model here is a LOCAL FAKE provider (e2e/fake-provider.ts) so the recording is repeatable without a key. It exercises the real
+// adapter and tools but is NOT a real model; the captions say so. NBK and Wise are the REAL public sources (read-only requests).
+await import("../e2e/fake-provider.ts");
+const LIVE_PORT = 8802;
+const LIVE_BASE = `http://127.0.0.1:${LIVE_PORT}`;
+const liveConfig = loadConfig({
+  APP_MODE: "live", APP_PORT: String(LIVE_PORT), APP_LOGIN_RATE_LIMIT: "1000", APP_WISE_QUOTES: "1", APP_NBK_RATES: "1",
+  APP_LLM_API_KEY: "fake-key-local-provider", APP_LLM_MODEL: "fake-model", APP_LLM_BASE_URL: "http://127.0.0.1:8797", APP_UPLOAD_DIR: "artifacts/tmp/live-uploads",
+});
+const liveCtx = { db: openDb(":memory:", "live"), clock: systemClock, config: liveConfig };
+const liveLlm = createLlm(liveConfig);
+const liveApp = buildApp({ ctx: liveCtx, runner: createRunner(liveCtx, liveLlm), llm: liveLlm });
+await liveApp.listen({ host: "127.0.0.1", port: LIVE_PORT });
 
 const IMG = "docs/deck/img";
 const VID_DIR = "artifacts/demo/tmp";
@@ -54,11 +70,99 @@ async function caption(p: Page, text: string) {
   }, text);
 }
 const pause = (ms: number) => page.waitForTimeout(ms);
-const TAG = "MOCK agent · SIMULATED payments · synthetic data";
+const TAG = "SANDBOX · MOCK agent · SIMULATED payments · fictional TEST DATA";
 
+// ================= LIVE mode segment =================
+const LIVE_TAG = "LIVE mode · model = LOCAL FAKE provider for this recording (not a real model) · real NBK and Wise sources · the app moves no money";
+function ibanOf(bban: string, cc = "KZ"): string {
+  const digits = (bban + cc + "00").split("").map((c) => (c >= "A" ? String(c.charCodeAt(0) - 55) : c)).join("");
+  let rem = 0;
+  for (const ch of digits) rem = (rem * 10 + Number(ch)) % 97;
+  return `${cc}${String(98 - rem).padStart(2, "0")}${bban}`;
+}
+const local = (d: Date) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+await page.goto(LIVE_BASE);
+await caption(page, `TuitionBridge in LIVE mode: real accounts, no fictional data. ${LIVE_TAG}`);
+await pause(4500);
+await page.getByTestId("toggle-register").click();
+await page.getByTestId("email").fill("student@example.org");
+await page.getByTestId("display-name").fill("Example Student");
+await page.getByTestId("password").fill("a-long-example-password");
+await page.getByTestId("login-btn").click();
+await page.getByTestId("funds").waitFor();
+await caption(page, "Step 1: you declare your USD and the amount to keep for living costs. The app reads no bank: these numbers are yours");
+await page.getByTestId("funds-balance-input").fill("1500");
+await page.getByTestId("funds-reserve-input").fill("300");
+await pause(2500);
+await page.getByTestId("funds-save").click();
+await pause(1500);
+await caption(page, "Step 2: you add the university as a trusted recipient from its official page. An invoice can never add one");
+await page.getByTestId("recipient-name").fill("Example University");
+await page.getByTestId("recipient-account").fill(ibanOf("125KZT0000000001"));
+await page.getByTestId("recipient-url").fill("https://example.edu/payments");
+await page.getByTestId("recipient-note").fill("Official payment page, copied for this recording");
+await pause(3000);
+await page.getByTestId("recipient-add").click();
+await pause(1500);
+await page.getByTestId("invoice-ref").fill("INV-RECORDING-1");
+await page.getByTestId("invoice-recipient").selectOption({ index: 1 });
+await page.getByTestId("invoice-amount").fill("500000");
+await page.getByTestId("invoice-due").fill(local(new Date(Date.now() + 10 * 86_400_000)));
+await caption(page, "Step 3: you enter the invoice and confirm every field. The recipient is matched to the one you attested");
+await pause(3500);
+await page.getByTestId("invoice-create").click();
+await page.getByTestId("confirm-invoice").click();
+await page.getByTestId("offers-card").waitFor();
+await caption(page, "Step 4: payment options come from named sources. The NBK reference rate is a guide, never an offer");
+await page.getByTestId("offers-card").scrollIntoViewIfNeeded();
+await pause(3500);
+await page.getByTestId("fetch-wise").click();
+await page.getByTestId("offers-message").waitFor({ timeout: 20_000 });
+let haveWise = (await page.getByTestId("offer-list").count()) > 0;
+if (haveWise) {
+  await caption(page, "Real Wise public quotes for this amount: rate, fee, estimated delivery and expiry come from the provider; nothing is invented");
+  await pause(6500);
+  await page.screenshot({ path: `${IMG}/live-offers.png`, fullPage: false });
+} else {
+  await caption(page, "Wise could not be reached from this machine right now: no quote is invented. You can enter an offer from your bank instead");
+  await pause(4500);
+  await page.getByText("Enter an offer you were given").click();
+  await page.getByTestId("offer-provider").fill("Example Bank");
+  await page.getByTestId("offer-rate").fill("450");
+  await page.getByTestId("offer-fee").fill("12");
+  await page.getByTestId("offer-arrival").fill(local(new Date(Date.now() + 3 * 86_400_000)));
+  await page.getByTestId("offer-valid").fill(local(new Date(Date.now() + 3 * 3600_000)));
+  await page.getByTestId("offer-seen").fill(local(new Date(Date.now() - 5 * 60_000)));
+  await page.getByTestId("offer-note").fill("Offer typed in for this recording");
+  await page.getByTestId("offer-add").click();
+  await pause(2500);
+  haveWise = false;
+}
+await page.getByTestId("start-task").scrollIntoViewIfNeeded();
+await caption(page, "Step 5: you ask the agent to plan. It reads the confirmed invoice, your declared funds and the stored offers");
+await pause(3000);
+await page.getByTestId("start-task").click();
+await page.getByTestId("approval-card").waitFor({ timeout: 30_000 });
+await page.getByTestId("approval-card").scrollIntoViewIfNeeded();
+await caption(page, "The exact proposal: recipient, amounts, reserve kept, and where this offer came from. The server chose the best route, not the model");
+await pause(8000);
+await page.getByTestId("approve-btn").click();
+await page.getByTestId("instruction-card").waitFor({ timeout: 20_000 });
+await page.getByTestId("instruction-card").scrollIntoViewIfNeeded();
+await caption(page, "After your approval the app issues a payment instruction. It has NOT moved any money: you pay in your bank or Wise");
+await pause(8000);
+await page.locator("#instruction-card").screenshot({ path: `${IMG}/live-instruction.png` });
+await page.getByTestId("mark-paid").click();
+await caption(page, "You can mark it paid or upload your confirmation. Both are stored as YOUR evidence, with a hash, and are never called bank verification");
+await pause(6500);
+await page.getByTestId("usd-balance").scrollIntoViewIfNeeded();
+await caption(page, "Your declared balance is unchanged: the app never debits anything in the live mode");
+await pause(4500);
+
+// ================= SANDBOX segment =================
 // ---- login ----
 await page.goto(BASE);
-await caption(page, `TuitionBridge: an agent that pays tuition only after you approve. ${TAG}`);
+await caption(page, `The separate SANDBOX used for the competition check. ${TAG}`);
 await pause(3500);
 await page.getByTestId("email").fill("alice@demo.local");
 await page.getByTestId("password").fill("demo-alice-2026");
@@ -161,6 +265,7 @@ const vid = (await page.video()?.path()) ?? "";
 }
 await browser.close();
 await app.close();
+await liveApp.close();
 const webm = "artifacts/demo/tuitionbridge-demo-mock.webm";
 if (vid) renameSync(vid, webm);
 rmSync(VID_DIR, { recursive: true, force: true });
@@ -170,3 +275,4 @@ try {
   execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-i", webm, "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "28", "-preset", "veryfast", "-an", "artifacts/demo/tuitionbridge-demo-mock.mp4"]);
 } catch { console.log("mp4 conversion skipped (ffmpeg/libx264 unavailable)"); }
 console.log(`recorded ${webm} (${(statSync(webm).size / 1e6).toFixed(1)} MB), duration ${dur}s, wall ${stamp()}s`);
+process.exit(0);

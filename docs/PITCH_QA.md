@@ -15,7 +15,8 @@ Safety does not depend on the model. There is no approval tool; the execution to
 **How do you handle failures?**
 Provider errors: up to 2 bounded retries, then a visible FAILED state with nothing paid. Limits (8 tool calls, 10 model requests, token budget) fail visibly. Expired quote or approval: refused, nothing paid, plan again. Recipient mismatch or ambiguity: invoice blocked with a recoverable correction path. Server restart mid-task: the task is marked interrupted, or completed if the payment had already been recorded.
 
-**Is the live model working?**
+**Is the live model working? What is real and what is test data?**
+The live mode needs a real model and uses real sources (Wise public quotes, offers the student types, the NBK reference); the sandbox is separate, labeled test data. The live mode does not move money.
 Not verified. The adapter uses the official SDK and is tested against a local fake provider; a bounded smoke test (`npm run smoke:live`) and a five-case live pack with token and time ceilings (`npm run eval:live`, see `docs/LIVE_RUN.md`) are ready but require a configured key and were not run. A report from a fake provider, MOCK, a failed run or a stale source is never shown as a real-model result.
 
 **What do the evaluation numbers mean?**

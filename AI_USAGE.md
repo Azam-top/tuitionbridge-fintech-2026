@@ -9,7 +9,8 @@ Status: **draft for the team to confirm.** The organizers' rules on AI-assisted 
 - **Human review:** `[TEAM TO COMPLETE: names, what each person reviewed (money algorithm, approval gate, tool loop, ledger transaction), date]`. Until this is filled in, the code should be treated as AI-generated and not yet human-reviewed. Do not describe it as reviewed.
 
 ## Runtime AI
-- Default: **no model is called.** A deterministic MOCK agent (`src/server/agent/mock-llm.ts`) drives the same tools. It is labeled MOCK in the UI and in all evidence.
+- **Live mode (the real application) requires a real model** configured with `APP_LLM_API_KEY` and `APP_LLM_MODEL`; without them planning is disabled and the UI says setup is required. The invoice fields, declared funds, offers and the student's instruction are sent to the configured provider in that mode.
+- **Sandbox mode** (fictional test data): a deterministic MOCK agent (`src/server/agent/mock-llm.ts`) drives the same tools; it is labeled MOCK in the UI and in all evidence. It is never used in the live mode.
 - Optional: an adapter for the Anthropic Messages API (`src/server/agent/anthropic-llm.ts`, official `@anthropic-ai/sdk`) activates only when `APP_LLM_API_KEY` and `APP_LLM_MODEL` are set. **It has not been verified against a live provider** in this repository. The model, if used, only selects tools and writes explanations; arithmetic, ranking, approval and ledger writes are deterministic code.
 - Training/analysis data: none beyond synthetic fixtures.
 
