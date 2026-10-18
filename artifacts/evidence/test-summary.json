@@ -1,20 +1,20 @@
 {
-  "generatedAt": "2026-10-18T06:04:25.996Z",
+  "generatedAt": "2026-10-18T11:12:15.589Z",
   "node": "v26.11.1",
   "projectVersion": "0.1.0",
-  "sourceCommit": "9a3f2b57738cc8169f21f790040df4e6ccd0d1a6",
+  "sourceCommit": "4bff48fc69cf4952a4efa85e1710899d6eefa639",
   "sourceDirty": false,
   "typecheck": "pass",
   "unitAndIntegration": {
-    "files": 14,
-    "total": 155,
-    "passed": 155,
+    "files": 15,
+    "total": 183,
+    "passed": 183,
     "failed": 0
   },
   "browser": {
     "runner": "Playwright + system Google Chrome",
-    "total": 17,
-    "passed": 17,
+    "total": 22,
+    "passed": 22,
     "failed": 0,
     "flaky": 0,
     "skipped": 0
