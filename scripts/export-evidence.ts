@@ -128,7 +128,7 @@ const manifest = {
   kind: "TuitionBridge evidence bundle",
   generatedAt, gitHead, sourceCommit: git.head, sourceDirty: git.dirty, node: process.version,
   note: "sourceCommit is the commit the sources were at when these runs were made; a later commit may only add these artifacts.",
-  labels: { agentMode: "MOCK (no model key configured for these runs)", payments: "SIMULATED", viewer: "REPLAY (offline record of the runs below)", liveModelVerified: liveAssessment.status === "VERIFIED" },
+  labels: { mode: "SANDBOX (fictional test data; not the live mode)", agentMode: "MOCK (no model key configured for these runs)", payments: "SIMULATED", viewer: "REPLAY (offline record of the runs below)", liveModelVerified: liveAssessment.status === "VERIFIED" },
   liveEvaluation: { status: liveAssessment.status, reasons: liveAssessment.reasons },
   redaction: "Contains no credentials, session/CSRF tokens, password hashes or API keys. All names, accounts and amounts are fictional. Token usage/cost are not reported for MOCK runs.",
   files: files.map((f) => ({ file: f, sha256: createHash("sha256").update(readFileSync(join(OUT, f))).digest("hex") })),
