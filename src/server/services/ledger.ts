@@ -32,7 +32,7 @@ export function getBalances(ctx: Ctx, ownerId: string): Balances {
       availableCents: (avail < 0n ? 0n : avail).toString(),
     },
     kzt: { accountId: kzt.id, balanceTiyn: kzt.balance_minor, reserveTiyn: kzt.reserve_minor },
-    note: "Currencies are never summed. Existing KZT funds are not used by this USD-funded payment flow.",
+    note: "Currencies are never summed. This sandbox scenario is funded from USD only; the student holds no KZT.",
   };
 }
 

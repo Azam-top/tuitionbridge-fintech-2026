@@ -24,7 +24,7 @@ describe("happy path ledger effects", () => {
     expect(receipt.totalDebitCents).toBe("101000");
     expect(receipt.usdBalanceAfterCents).toBe("49000");
     expect(balance(ctx, ALICE, "USD")).toBe(49_000n);
-    expect(balance(ctx, ALICE, "KZT")).toBe(80_000_000n); // untouched
+    expect(balance(ctx, ALICE, "KZT")).toBe(0n); // USD-only scenario: the payment never touches the student's KZT account
     const uni = ctx.db.prepare("SELECT balance_minor FROM ledger_accounts WHERE id='acc_uni_kzt'").get() as { balance_minor: string };
     expect(uni.balance_minor).toBe("50000000");
     expect(ledgerTotals(ctx)).toEqual(before);

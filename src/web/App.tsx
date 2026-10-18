@@ -178,7 +178,6 @@ function Funds({ st }: { st: StateResponse | null }) {
         <Row label="USD balance" strong testId="usd-balance">{formatUsd(b.usd.balanceCents)}</Row>
         <Row label="USD kept for living costs" testId="usd-reserve">{formatUsd(b.usd.reserveCents)}</Row>
         <Row label="USD available to pay" testId="usd-available">{formatUsd(b.usd.availableCents)}</Row>
-        <Row label="KZT balance (not used here)" testId="kzt-balance">{formatKzt(b.kzt.balanceTiyn)}</Row>
       </dl>
       <p className="hint">{b.note}</p>
     </Card>
