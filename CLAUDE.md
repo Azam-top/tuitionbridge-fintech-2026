@@ -25,4 +25,4 @@ Competition prototype (fictional data, SIMULATED payments). Full contract: docs/
 7. One payment per invoice and per proposal; idempotency key is bound to the payload.
 8. Reserve is never silently lowered by the model; model args are validated against the parsed intent.
 9. Mock mode is labeled MOCK; payments are always labeled SIMULATED. Never fabricate usage/cost/live results.
-10. Do not weaken tests to pass them. Do not send anything externally (email, push, deploy).
+10. Do not weaken tests to pass them. Do not send anything externally (email, push, deploy) unless the user explicitly asks for that specific action.

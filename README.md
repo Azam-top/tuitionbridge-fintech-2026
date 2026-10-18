@@ -4,7 +4,7 @@ A competition prototype (2026 Shenzhen International FinTech Competition, Intern
 
 **Everything is synthetic.** Fictional university, fictional providers, fake accounts. No real money moves and no real bank or payment provider is contacted. The UI always shows `PAYMENTS: SIMULATED`, and `AGENT: MOCK` unless a model key is configured.
 
-Repository: **[REPOSITORY URL TO BE ADDED]** (no public repository exists yet).
+Repository: <https://github.com/Azam-top/tuitionbridge-fintech-2026>
 
 ## Install and run
 

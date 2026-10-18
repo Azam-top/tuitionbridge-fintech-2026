@@ -16,7 +16,7 @@ Deadline: **20 Oct 2026, 23:59 Beijing = 20:59 Almaty**. Recommended: submit on 
 | Demo video (≤5 min) | **Exists, with caveats**: 1 min 40 s, MOCK agent, captions, no narration | `artifacts/demo/tuitionbridge-demo-mock.mp4` |
 | AI usage statement | Draft: **HUMAN must complete the review section** | `AI_USAGE.md` |
 | Dependency licenses | Done | `docs/DEPENDENCIES.md` |
-| Repository URL | **Placeholder: `[REPOSITORY URL TO BE ADDED]`** (no real repository exists) | |
+| Repository URL | Done (public) | <https://github.com/Azam-top/tuitionbridge-fintech-2026> |
 
 Measured at packaging time: see `artifacts/evidence/test-summary.json` (type check, unit/integration, browser) and `eval-mock.json`. Re-run `npm run test:summary && npm run eval && npm run evidence && npm run deck` after any change.
 
