@@ -69,7 +69,9 @@ describe("evaluation runner exit status (fake provider, no spend)", () => {
     expect(r.code).toBe(1);
     const report = JSON.parse(readFileSync(join(dir, "eval-live.json"), "utf8"));
     expect(report.denominator).toBe(2);
-    expect(report.passed).toBe(0);
+    // The default pack's second case is refused by the server before any model call, so it passes even with a dead provider.
+    expect(report.cases.map((c: { id: string; passed: boolean }) => [c.id, c.passed])).toEqual([["live-01", false], ["live-02", true]]);
+    expect(report.passed).toBe(1);
     expect(report.gate).toMatchObject({ mode: "release-gate", ok: false });
     // Observational mode is explicit, still records the failure, and does not gate.
     const dir2 = mkdtempSync(join(tmpdir(), "tb-eval-"));

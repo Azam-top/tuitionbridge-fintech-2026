@@ -42,3 +42,15 @@ export function evaluateGate(input: GateInput): GateOutcome {
   const ok = failures.length === 0;
   return { mode: input.reportOnly ? "report-only" : "release-gate", ok, failures, exitCode: input.reportOnly || ok ? 0 : 1 };
 }
+
+/** Parses `--name=N` as an integer within [min, max]; anything else is rejected. */
+export function parseBoundedInt(argv: string[], name: string, fallback: number, min: number, max: number): number {
+  const prefix = `--${name}=`;
+  const arg = argv.find((a) => a.startsWith(prefix));
+  if (arg === undefined) return fallback;
+  const raw = arg.slice(prefix.length);
+  if (!/^\d+$/.test(raw)) throw new Error(`--${name} must be a positive integer, got "${raw}"`);
+  const n = Number(raw);
+  if (n < min || n > max) throw new Error(`--${name} must be between ${min} and ${max}, got ${n}`);
+  return n;
+}

@@ -40,7 +40,7 @@ export interface Provenance {
   sourceCommit: string | null;
   sourceDirty: boolean;
   runAt: string;
-  parameters: { live: boolean; maxCases: number | null; reportOnly: boolean; casesVersion: string; taskTokenBudgetCap: number | null };
+  parameters: { live: boolean; pack: string | null; maxCases: number | null; maxTotalTokens: number | null; caseTimeoutSeconds: number | null; reportOnly: boolean; casesVersion: string; taskTokenBudgetCap: number | null };
   paymentsEnvironment: "SIMULATED";
 }
 

@@ -1,6 +1,7 @@
 import { Harness, Scripted, turn, transient, ALICE, BOB } from "./harness";
 import { createRunner, getTask, type Runner, type TaskRow } from "../../src/server/agent/runner";
 import { MockLlm } from "../../src/server/agent/mock-llm";
+import { AnthropicLlm } from "../../src/server/agent/anthropic-llm";
 import type { LlmClient } from "../../src/server/agent/types";
 import { PolicyError } from "../../src/server/errors";
 import { confirmInvoice, listInvoices, updateInvoice } from "../../src/server/services/invoices";
@@ -256,6 +257,23 @@ export const FLOWS: Record<string, Flow> = {
     let failures = Number(c.params.failures);
     const mock = new MockLlm();
     const llm = new Scripted((req) => { if (failures-- > 0) throw transient(); return mock.complete(req); });
+    const t = await plan(h, createRunner(h.ctx, llm, { retryDelayMs: 1 }));
+    return summarize(h, t);
+  },
+
+  /** Cancel while the first model request is still outstanding; late work must be discarded. */
+  async live_cancel(h, _c, llm) {
+    ensureConfirmed(h);
+    const runner = createRunner(h.ctx, llm(), { retryDelayMs: 1 });
+    const t = runner.startTask(ALICE, "execute", invoiceId(h), EN);
+    runner.cancel(ALICE, t.id);
+    await runner.settled(t.id);
+    return summarize(h, getTask(h.ctx, ALICE, t.id));
+  },
+
+  /** The real adapter class against an unreachable loopback port: exercises error classification and bounded retries; sends no key and spends nothing. */
+  async adapter_unreachable(h) {
+    const llm = new AnthropicLlm("unused-key-never-sent", "adapter-failure-probe", 2000, "http://127.0.0.1:1");
     const t = await plan(h, createRunner(h.ctx, llm, { retryDelayMs: 1 }));
     return summarize(h, t);
   },
