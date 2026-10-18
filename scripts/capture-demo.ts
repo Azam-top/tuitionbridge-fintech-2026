@@ -70,6 +70,12 @@ async function caption(p: Page, text: string) {
   }, text);
 }
 const pause = (ms: number) => page.waitForTimeout(ms);
+/** Element screenshot with the recording caption hidden, so no overlay text ends up in the slide image. */
+async function shot(p: Page, selector: string, path: string) {
+  await p.evaluate(() => { const c = document.getElementById("demo-caption"); if (c) c.style.display = "none"; });
+  await p.locator(selector).screenshot({ path });
+  await p.evaluate(() => { const c = document.getElementById("demo-caption"); if (c) c.style.display = ""; });
+}
 const TAG = "SANDBOX · MOCK agent · SIMULATED payments · fictional TEST DATA";
 
 // ================= LIVE mode segment =================
@@ -122,7 +128,7 @@ let haveWise = (await page.getByTestId("offer-list").count()) > 0;
 if (haveWise) {
   await caption(page, "Real Wise public quotes for this amount: rate, fee, estimated delivery and expiry come from the provider; nothing is invented");
   await pause(6500);
-  await page.screenshot({ path: `${IMG}/live-offers.png`, fullPage: false });
+  await shot(page, "#offers", `${IMG}/live-offers.png`);
 } else {
   await caption(page, "Wise could not be reached from this machine right now: no quote is invented. You can enter an offer from your bank instead");
   await pause(4500);
@@ -151,7 +157,7 @@ await page.getByTestId("instruction-card").waitFor({ timeout: 20_000 });
 await page.getByTestId("instruction-card").scrollIntoViewIfNeeded();
 await caption(page, "After your approval the app issues a payment instruction. It has NOT moved any money: you pay in your bank or Wise");
 await pause(8000);
-await page.locator("#instruction-card").screenshot({ path: `${IMG}/live-instruction.png` });
+await shot(page, "#instruction-card", `${IMG}/live-instruction.png`);
 await page.getByTestId("mark-paid").click();
 await caption(page, "You can mark it paid or upload your confirmation. Both are stored as YOUR evidence, with a hash, and are never called bank verification");
 await pause(6500);
