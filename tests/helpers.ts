@@ -36,7 +36,9 @@ export function proposalFor(ctx: Ctx, opts: { owner?: string; provider?: "A" | "
   const owner = opts.owner ?? ALICE;
   const invoiceId = opts.invoiceId ?? confirmedInvoiceId(ctx, owner);
   const quoteId = quoteIdFor(ctx, invoiceId, opts.provider ?? "C", owner);
-  return prepareProposal(ctx, { ownerId: owner, tier: "propose", invoiceId, quoteId, preference: "cheapest", reserveCents: opts.reserve ?? "30000" });
+  // A is the fastest route and C the cheapest; the server enforces that the chosen quote wins the stated objective.
+  const preference = (opts.provider ?? "C") === "A" ? "fastest" : "cheapest";
+  return prepareProposal(ctx, { ownerId: owner, tier: "propose", invoiceId, quoteId, preference, reserveCents: opts.reserve ?? "30000" });
 }
 
 export function approvedProposal(ctx: Ctx, opts: Parameters<typeof proposalFor>[1] = {}) {

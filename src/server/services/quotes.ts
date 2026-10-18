@@ -25,6 +25,19 @@ export function getQuote(ctx: Ctx, ownerId: string, quoteId: string): QuoteRecor
   return rowToQuote(r);
 }
 
+/** The current quote set: the highest version per provider issued for this invoice. */
+export function latestQuotesForInvoice(ctx: Ctx, ownerId: string, invoiceId: string): QuoteRecord[] {
+  const rows = ctx.db.prepare(
+    "SELECT * FROM quotes WHERE owner_user_id = ? AND invoice_id = ? ORDER BY provider_id, version DESC",
+  ).all(ownerId, invoiceId) as QuoteRow[];
+  const seen = new Set<string>();
+  const out: QuoteRecord[] = [];
+  for (const r of rows) {
+    if (!seen.has(r.provider_id)) { seen.add(r.provider_id); out.push(rowToQuote(r)); }
+  }
+  return out;
+}
+
 /**
  * Issues a fresh set of SIMULATED quotes for a confirmed invoice. Arrival times are estimates, not guarantees.
  * Each call creates a new quote version per provider; older versions are never reused implicitly.
