@@ -7,6 +7,8 @@ export interface AppConfig {
   demoMode: boolean;
   llmApiKey: string | null;
   llmModel: string | null;
+  /** Optional provider endpoint override; used to point the adapter at a local fake provider in tests. */
+  llmBaseUrl: string | null;
   llmMaxOutputTokens: number;
   taskTokenBudget: number;
   maxToolCalls: number;
@@ -33,6 +35,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     demoMode: env.APP_DEMO_MODE !== "0",
     llmApiKey: key ? key : null,
     llmModel: model ? model : null,
+    llmBaseUrl: env.APP_LLM_BASE_URL?.trim() || null,
     llmMaxOutputTokens: num(env.APP_LLM_MAX_OUTPUT_TOKENS, 8192),
     taskTokenBudget: num(env.APP_TASK_TOKEN_BUDGET, 80000),
     maxToolCalls: num(env.APP_MAX_TOOL_CALLS, 8),

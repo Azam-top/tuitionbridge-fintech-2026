@@ -6,6 +6,7 @@ import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { parseRate, recipientTiyn, senderPrincipalCents, formatKzt, formatUsd } from "../src/shared/money";
 import { PROVIDERS } from "../src/server/fixtures";
+import { assessLiveReport } from "./lib/provenance";
 
 const evalMock = JSON.parse(readFileSync("artifacts/evidence/eval-mock.json", "utf8")) as {
   passed: number; denominator: number; criticalGates: { passed: number; total: number }; unauthorizedSuccessfulPayments: number;
@@ -14,7 +15,8 @@ const evalMock = JSON.parse(readFileSync("artifacts/evidence/eval-mock.json", "u
 const tests = JSON.parse(readFileSync("artifacts/evidence/test-summary.json", "utf8")) as {
   typecheck: string; unitAndIntegration: { total: number; passed: number; files: number }; browser: { total: number; passed: number };
 };
-const liveEvalExists = existsSync("artifacts/evidence/eval-live.json");
+// A live report counts only if its CONTENT and provenance qualify; a file's existence proves nothing.
+const liveAssessment = assessLiveReport(existsSync("artifacts/evidence/eval-live.json") ? JSON.parse(readFileSync("artifacts/evidence/eval-live.json", "utf8")) : null);
 const e = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
 
 // Route table computed from the real policy math
@@ -48,7 +50,7 @@ const S: Slide[] = [
     notes: "Walk left to right. Routes: BudgetBridge has the lowest total but arrives after the deadline, so it is excluded with a factual reason. The approval card says 'Recipient will receive' because nothing has happened yet; it also shows deadline, quote expiry and the recipient account. The receipt is past tense and labeled SIMULATED. If time allows, play the demo video." },
   { title: "Why an agent, not just a form", seconds: 60,
     html: `<div class="cols"><div class="panel"><h3>What the agent adds</h3><ul><li>Turns a plain instruction into constraints (English; one Russian instruction tested): preference and reserve</li><li>Reads and compares quotes, explains each exclusion</li><li>Recovers from blocks: mismatch, ambiguity, expired quote</li><li>Works through a bounded tool loop: 8 tool calls, 10 model requests, 2 retries</li></ul></div>
-      <div class="panel"><h3>What it is not allowed to do</h3><ul><li>Approve a payment (no such tool exists)</li><li>Do arithmetic or change the beneficiary, deadline or reserve</li><li>Follow orders found inside an invoice</li></ul><p class="small warnbox">Honest status: demos and evidence use a deterministic MOCK agent. The live-model adapter exists but is <strong>not verified</strong>.</p></div></div>`,
+      <div class="panel"><h3>What it is not allowed to do</h3><ul><li>Approve a payment (no such tool exists)</li><li>Do arithmetic or change the beneficiary, deadline or reserve</li><li>Follow orders found inside an invoice</li></ul><p class="small warnbox">Honest status: demos and evidence use a deterministic MOCK agent. ${liveAssessment.status === "VERIFIED" ? "The live-model adapter was exercised on a small sample (see the evaluation slide)." : "The live-model adapter exists but is <strong>not verified</strong>."}</p></div></div>`,
     notes: "The value of the agent is the messy edges a fixed form handles badly: free-text preferences, explanations, recovery. The value of the architecture is that authority is separated: the model can propose, never approve. Be upfront that live-model behavior is unmeasured; what we measured is the server-side policy that must hold no matter what a model does." },
   { title: "Route and reserve algorithm", seconds: 75,
     html: `<table class="routes"><thead><tr><th>Provider</th><th>Rate (KZT/USD)</th><th>Fixed fee</th><th>Total debit</th><th>Recipient gets</th><th>Estimated arrival</th><th>Result</th></tr></thead><tbody>${rows}</tbody></table>
@@ -63,12 +65,12 @@ const S: Slide[] = [
     html: `<div class="cols"><div class="panel"><h3>Deterministic evaluation (MOCK + scripted drivers)</h3><p class="big">${evalMock.passed}/${evalMock.denominator} <small>cases</small></p><ul class="cats">${cats}</ul>
       <p class="small">Critical security gates: <strong>${evalMock.criticalGates.passed}/${evalMock.criticalGates.total}</strong> · unauthorized successful payments: <strong>${evalMock.unauthorizedSuccessfulPayments}</strong></p></div>
       <div class="panel"><h3>Test suites (measured)</h3><ul><li>Type check: ${tests.typecheck}</li><li>Unit + integration: ${tests.unitAndIntegration.passed}/${tests.unitAndIntegration.total}</li><li>Browser (Chrome): ${tests.browser.passed}/${tests.browser.total}</li><li>Manual check: 11 controls broken one at a time; 9 caught at once, 1 needed one extra test, 1 is an equivalent mutant (defense in depth)</li></ul>
-      <p class="warnbox">${liveEvalExists ? "Real-model evaluation: see artifacts/evidence/eval-live.json" : "<strong>Real-model evaluation: NOT RUN.</strong> It needs a configured key. These results say nothing about how a live model behaves."}</p>
+      <p class="warnbox">${liveAssessment.status === "VERIFIED" ? e(liveAssessment.summary) : `<strong>${e(liveAssessment.summary)}</strong> The results on this slide say nothing about how a live model behaves.`}</p>
       <p class="small">Targets (≥27/30, all critical gates, zero unauthorized) are our own, not official thresholds.</p></div></div>`,
     notes: `The ${evalMock.denominator} cases are fixed and stored with expected outcomes; a correctly blocked outcome counts as a pass. Model-driven cases use the deterministic mock; adversarial cases use scripted models that obey injections, to prove the server refuses. State clearly that this is a policy-layer evaluation. The real-model evaluation was not run. Evaluation generated ${evalMock.generatedAt} at commit ${evalMock.environment.gitHead}.` },
   { title: "Architecture and honest limits", seconds: 45,
     html: `<div class="cols"><div class="panel"><h3>Architecture</h3><ul><li>React UI → Fastify API → services → SQLite</li><li>Pure TypeScript money and policy modules</li><li>Agent runner with a swappable model adapter (MOCK / Anthropic SDK)</li><li>Evidence = stored tool events and ledger rows</li></ul></div>
-      <div class="panel warn"><h3>Limits</h3><ul><li>Simulated payments; one currency pair; no real provider</li><li>No OCR; text PDFs only</li><li>Live model not verified; provider for the Shenzhen venue unconfirmed</li><li>Local demo: loopback HTTP, demo credentials</li><li>No KYC/AML; not regulatory advice</li></ul></div></div>`,
+      <div class="panel warn"><h3>Limits</h3><ul><li>Simulated payments; one currency pair; no real provider</li><li>No OCR; text PDFs only</li><li>${liveAssessment.status === "VERIFIED" ? "Live model checked on a small sample only" : "Live model not verified"}; provider for the Shenzhen venue unconfirmed</li><li>Local demo: loopback HTTP, demo credentials</li><li>No KYC/AML; not regulatory advice</li></ul></div></div>`,
     notes: "Keep this fast. The architecture slide exists so judges see where authority lives. The limits slide is deliberate: simulated payments, no real rails, no OCR, unverified live model, unconfirmed venue inference provider. The rubric discrepancy between the track brief and the general site is an open organizer question." },
   { title: "Deployment and business: hypotheses, not results", seconds: 45,
     html: `<div class="panel"><p class="todo">All of this slide is hypothesis. No pricing, partner or customer evidence exists yet.</p><ul>
