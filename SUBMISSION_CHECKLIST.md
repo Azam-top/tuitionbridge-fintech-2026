@@ -13,7 +13,7 @@ Deadline: **20 Oct 2026, 23:59 Beijing = 20:59 Almaty**. Recommended: submit on 
 | Evaluation (30 cases) | Done: deterministic only | `eval/cases.json`, `artifacts/evidence/eval-mock.json` |
 | Pitch deck + speaker notes | Done | `docs/deck/index.html`, `docs/deck/TuitionBridge_pitch.pdf`, `..._with_notes.pdf` |
 | Judge Q&A, demo script | Done | `docs/PITCH_QA.md`, `docs/DEMO_SCRIPT.md` |
-| Demo video (≤5 min) | **Exists, with caveats**: 1 min 40 s, MOCK agent, captions, no narration | `artifacts/demo/tuitionbridge-demo-mock.mp4` |
+| Demo video (≤5 min) | **Exists, with caveats**: re-recorded 2026-10-18 from the redesigned UI, 1 min 42 s, MOCK agent, captions, no narration | `artifacts/demo/tuitionbridge-demo-mock.mp4` |
 | AI usage statement | Draft: **HUMAN must complete the review section** | `AI_USAGE.md` |
 | Dependency licenses | Done | `docs/DEPENDENCIES.md` |
 | Repository URL | Done (public) | <https://github.com/Azam-top/tuitionbridge-fintech-2026> |
