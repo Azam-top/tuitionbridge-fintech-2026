@@ -21,7 +21,7 @@ export function resolveIntent(instruction: string, accountReserveCents: string):
   if (text.length > MAX_INSTRUCTION_CHARS) throw new PolicyError("VALIDATION", `Instruction is longer than ${MAX_INSTRUCTION_CHARS} characters.`);
   const p = parseInstruction(text);
   if (p.ambiguous.length) {
-    throw new PolicyError("INTENT_CONFLICT", `${p.ambiguous.join(" ")} Please state a single preference and a non-zero reserve.`);
+    throw new PolicyError("INTENT_CONFLICT", `${p.ambiguous.join(" ")} Please state a single preference and one non-zero reserve in USD.`);
   }
   return {
     preference: p.preference,
