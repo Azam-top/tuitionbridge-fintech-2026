@@ -26,7 +26,9 @@ export default defineConfig({
       url: "http://127.0.0.1:8797/health", reuseExistingServer: false, timeout: 30_000,
     },
     {
-      command: `rm -rf data/e2e-live.sqlite* data/e2e-uploads-live && APP_MODE=live APP_PORT=8798 APP_DB_PATH=data/e2e-live.sqlite APP_UPLOAD_DIR=data/e2e-uploads-live APP_WISE_QUOTES=0 APP_NBK_RATES=0 ${common} APP_LLM_API_KEY=fake-key-local-provider APP_LLM_MODEL=fake-model APP_LLM_BASE_URL=http://127.0.0.1:8797 node --import tsx src/server/index.ts`,
+      command: `rm -rf data/e2e-live.sqlite* data/e2e-uploads-live && APP_MODE=live APP_PORT=8798 APP_DB_PATH=data/e2e-live.sqlite APP_UPLOAD_DIR=data/e2e-uploads-live APP_WISE_QUOTES=0 APP_NBK_RATES=0 ${common} node --import tsx src/server/index.ts`,
+      // A placeholder credential for the LOCAL FAKE provider only (passed as env, not in the command line).
+      env: { APP_LLM_API_KEY: "fake-key-local-provider", APP_LLM_MODEL: "fake-model", APP_LLM_BASE_URL: "http://127.0.0.1:8797" },
       url: "http://127.0.0.1:8798/api/config", reuseExistingServer: false, timeout: 60_000,
     },
   ],
