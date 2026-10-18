@@ -8,6 +8,8 @@ import { getBalances } from "../services/ledger.js";
 import { resolveIntent, type TaskIntent } from "./intent.js";
 import { POST_APPROVAL_TOOLS, PRE_APPROVAL_TOOLS, TOOL_SPECS, runTool, type ToolEnv, type ToolName } from "./tools.js";
 import { LlmError, type ChatMessage, type LlmClient, type LlmTurn, type ToolResultMsg } from "./types.js";
+import { checkNarrative, collectNumbers, type GroundingFacts } from "./grounding.js";
+import { approvalExists, blockedSummary, proposalPayload, proposalSummary, receiptForProposal, receiptSummary } from "./outcome.js";
 
 export type TaskState = "RUNNING" | "AWAITING_APPROVAL" | "EXECUTING" | "COMPLETED" | "BLOCKED" | "FAILED" | "CANCELLED";
 
@@ -19,6 +21,11 @@ export interface TaskRow {
 }
 
 const ACTIVE: TaskState[] = ["RUNNING", "AWAITING_APPROVAL", "EXECUTING"];
+
+/** Thrown inside a phase when the task is no longer in the state that phase owns (e.g. cancelled). Late work is dropped. */
+class TaskSupersededError extends Error {
+  constructor() { super("task state changed"); }
+}
 
 /** Requests/tool calls kept in reserve so the post-approval phase can always execute and summarize. */
 const RESERVED_REQUESTS = 2;
@@ -74,16 +81,32 @@ export function createRunner(ctx: Ctx, llm: LlmClient, opts: { retryDelayMs?: nu
     );
   };
 
-  const finish = (taskId: string, ownerId: string, state: TaskState, error: string | null, summary: string | null) => {
-    setTask(taskId, { state, error, summary });
+  /**
+   * Moves a task to a new state. When `from` is given the transition is conditional (compare-and-set), so a phase
+   * that finishes late cannot overwrite a terminal state such as CANCELLED. Returns whether the transition applied.
+   */
+  const finish = (taskId: string, ownerId: string, state: TaskState, error: string | null, summary: string | null, from?: TaskState[]): boolean => {
+    const guard = from ? ` AND state IN (${from.map(() => "?").join(",")})` : "";
+    const r = ctx.db.prepare(`UPDATE agent_tasks SET state = ?, error = ?, summary = ?, updated_at = ? WHERE id = ?${guard}`).run(
+      state, error, summary, ctx.clock.now().toISOString(), taskId, ...(from ?? []),
+    );
+    if (r.changes !== 1) return false;
     event(taskId, "state", { text: `${state}${error ? `: ${error}` : ""}` });
     audit(ctx.db, ctx.clock, { ownerUserId: ownerId, taskId, mode: llm.mode, event: "task.state", result: state === "FAILED" ? "ERROR" : "INFO", refs: { state, error: error?.slice(0, 120) ?? null } });
+    return true;
   };
 
   type Phase = "prepare" | "execute";
 
+  const ownedState = (phase: Phase): TaskState => (phase === "prepare" ? "RUNNING" : "EXECUTING");
+  /** Throws if the task left the state this phase owns (cancelled, restarted, ...). Called after every await. */
+  const assertOwned = (taskId: string, phase: Phase) => {
+    if (getTaskById(taskId).state !== ownedState(phase)) throw new TaskSupersededError();
+  };
+
   async function callWithRetry(taskId: string, phase: Phase, sys: string, messages: ChatMessage[], toolNames: ToolName[]): Promise<LlmTurn> {
     for (let attempt = 0; ; attempt++) {
+      assertOwned(taskId, phase);
       const t = getTaskById(taskId);
       const cap = phase === "prepare" ? cfg.maxModelRequests - RESERVED_REQUESTS : cfg.maxModelRequests;
       if (t.model_requests >= cap) throw new PolicyError("LIMIT_REACHED", `Model request limit reached (${t.model_requests}/${cfg.maxModelRequests}).`);
@@ -100,6 +123,7 @@ export function createRunner(ctx: Ctx, llm: LlmClient, opts: { retryDelayMs?: nu
       } catch (e) {
         const ms = Math.round(performance.now() - started);
         ctx.db.prepare("UPDATE agent_tasks SET latency_ms = latency_ms + ? WHERE id = ?").run(ms, taskId);
+        assertOwned(taskId, phase);
         if (e instanceof LlmError && e.transient && getTaskById(taskId).retries < cfg.maxTransientRetries) {
           bump(taskId, "retries");
           event(taskId, "retry", { text: `Transient provider error (${e.message}); retrying.` });
@@ -122,19 +146,47 @@ export function createRunner(ctx: Ctx, llm: LlmClient, opts: { retryDelayMs?: nu
     } as ToolEnv;
   }
 
-  async function loop(taskId: string, phase: Phase, tier: Tier, firstUser: string): Promise<{ lastText: string }> {
+  function groundingFacts(taskId: string, numbers: Set<string>): GroundingFacts {
+    const t = getTaskById(taskId);
+    const payload = proposalPayload(ctx, t.proposal_id);
+    const receipt = receiptForProposal(ctx, t.proposal_id);
+    const all = new Set(numbers);
+    collectNumbers(payload, all);
+    collectNumbers(receipt, all);
+    return {
+      numbers: all, paymentExists: !!receipt, approvalExists: approvalExists(ctx, t.proposal_id),
+      proposalPreference: payload?.preference ?? null,
+    };
+  }
+
+  /**
+   * Shows model prose only if it is consistent with backend records. Otherwise it is withheld and the reason is
+   * recorded; the withheld text itself is not stored or shown, so it cannot reach the UI through the timeline.
+   */
+  function recordAssistantText(taskId: string, text: string, numbers: Set<string>) {
+    const check = checkNarrative(text, groundingFacts(taskId, numbers));
+    if (check.ok) event(taskId, "assistant", { text });
+    else event(taskId, "assistant_withheld", { text: `Model commentary withheld: it contained ${check.reasons.join("; ")}.` });
+  }
+
+  async function loop(taskId: string, phase: Phase, tier: Tier, firstUser: string): Promise<void> {
     const toolNames = phase === "prepare" ? PRE_APPROVAL_TOOLS : POST_APPROVAL_TOOLS;
     const messages: ChatMessage[] = [{ role: "user", text: firstUser }];
-    let lastText = "";
+    // Numbers the student themselves supplied (their instruction and reserve) are legitimate to repeat.
+    const trusted = new Set<string>();
+    const intent = JSON.parse(getTaskById(taskId).intent_json) as TaskIntent;
+    collectNumbers([intent.instruction, intent.reserveCents], trusted);
     for (;;) {
       const turn = await callWithRetry(taskId, phase, SYSTEM_PROMPT, messages, toolNames);
-      if (turn.text) { lastText = turn.text; event(taskId, "assistant", { text: turn.text }); }
+      assertOwned(taskId, phase);
+      if (turn.text) recordAssistantText(taskId, turn.text, trusted);
       if (turn.stop === "max_tokens") throw new PolicyError("LIMIT_REACHED", "The model hit its output token limit before finishing.");
       if (turn.stop === "refusal") throw new PolicyError("PROVIDER_FAILURE", "The model declined this request.");
       messages.push({ role: "assistant", text: turn.text, toolCalls: turn.toolCalls, raw: turn.raw });
-      if (!turn.toolCalls.length) return { lastText };
+      if (!turn.toolCalls.length) return;
       const results: ToolResultMsg[] = [];
       for (const call of turn.toolCalls) {
+        assertOwned(taskId, phase);
         const t = getTaskById(taskId);
         const toolCap = phase === "prepare" ? cfg.maxToolCalls - RESERVED_TOOL_CALLS : cfg.maxToolCalls;
         if (t.tool_calls >= toolCap) throw new PolicyError("LIMIT_REACHED", `Tool call limit reached (${t.tool_calls}/${cfg.maxToolCalls}).`);
@@ -147,6 +199,7 @@ export function createRunner(ctx: Ctx, llm: LlmClient, opts: { retryDelayMs?: nu
           out = await withTimeout(() => Promise.resolve(runTool(toolEnv(t, tier), call.name, call.input)), cfg.toolTimeoutMs, call.name);
         }
         event(taskId, "tool", { tool: call.name, ok: out.ok, input: call.input, output: out.data });
+        if (out.ok) collectNumbers(out.data, trusted);
         if (out.proposalId) setTask(taskId, { proposal_id: out.proposalId });
         if (out.paymentId) setTask(taskId, { payment_id: out.paymentId });
         results.push({ id: call.id, name: call.name, content: JSON.stringify(out.data), isError: !out.ok });
@@ -160,43 +213,61 @@ export function createRunner(ctx: Ctx, llm: LlmClient, opts: { retryDelayMs?: nu
     const intent = JSON.parse(t.intent_json) as TaskIntent;
     const first = `Student instruction: ${intent.instruction}\nTask context: invoice_id=${t.invoice_id}; reserve_hint=${intent.reserveCents} (USD cents).`;
     try {
-      const { lastText } = await loop(taskId, "prepare", tier, first);
+      await loop(taskId, "prepare", tier, first);
       const after = getTaskById(taskId);
       const pending = after.proposal_id
         ? (ctx.db.prepare("SELECT status FROM proposals WHERE id = ?").get(after.proposal_id) as { status: string } | undefined)
         : undefined;
-      if (pending?.status === "PENDING") {
-        finish(taskId, t.owner_user_id, "AWAITING_APPROVAL", null, lastText || "Proposal ready for your approval.");
-      } else {
-        finish(taskId, t.owner_user_id, "BLOCKED", null, lastText || "No payment was prepared.");
-      }
+      const payload = pending?.status === "PENDING" ? proposalPayload(ctx, after.proposal_id) : null;
+      if (payload) finish(taskId, t.owner_user_id, "AWAITING_APPROVAL", null, proposalSummary(payload), ["RUNNING"]);
+      else finish(taskId, t.owner_user_id, "BLOCKED", null, blockedSummary(ctx, taskId, "prepare"), ["RUNNING"]);
     } catch (e) {
-      failTask(taskId, t.owner_user_id, e);
+      if (e instanceof TaskSupersededError) return; // cancelled while a model call was outstanding: discard late work
+      // A proposal that was already prepared is a stored, bound record; a later model failure only costs the commentary.
+      const keep = e instanceof PolicyError && (e.code === "PROVIDER_FAILURE" || e.code === "LIMIT_REACHED");
+      const after = getTaskById(taskId);
+      const prop = keep && after.proposal_id ? (ctx.db.prepare("SELECT status FROM proposals WHERE id = ?").get(after.proposal_id) as { status: string } | undefined) : undefined;
+      const payload = prop?.status === "PENDING" ? proposalPayload(ctx, after.proposal_id) : null;
+      if (payload) {
+        event(taskId, "explanation_unavailable", { text: "The proposal was prepared, but the assistant could not finish its explanation. Review the proposal below." });
+        finish(taskId, t.owner_user_id, "AWAITING_APPROVAL", null, proposalSummary(payload), ["RUNNING"]);
+      } else failTask(taskId, t.owner_user_id, e, "prepare");
     }
   }
 
   async function executePhase(taskId: string, tier: Tier) {
     const t = getTaskById(taskId);
     const first = `The student has approved the proposal. Call execute_sandbox_payment for proposal_id=${t.proposal_id} and then summarize the receipt.`;
+    let failure: unknown = null;
     try {
-      const { lastText } = await loop(taskId, "execute", tier, first);
-      const after = getTaskById(taskId);
-      if (after.payment_id) finish(taskId, t.owner_user_id, "COMPLETED", null, lastText || "Payment executed in the simulated ledger.");
-      else finish(taskId, t.owner_user_id, "BLOCKED", "Payment was not executed.", lastText || "Payment was not executed.");
+      await loop(taskId, "execute", tier, first);
     } catch (e) {
-      failTask(taskId, t.owner_user_id, e);
+      if (e instanceof TaskSupersededError) return;
+      failure = e;
+    }
+    // The ledger, not the model, is the source of truth for whether money moved.
+    const receipt = receiptForProposal(ctx, t.proposal_id);
+    if (receipt) {
+      setTask(taskId, { payment_id: receipt.paymentId });
+      if (failure) event(taskId, "explanation_unavailable", { text: "The payment was recorded, but the assistant could not finish its explanation. The receipt above is authoritative." });
+      finish(taskId, t.owner_user_id, "COMPLETED", null, receiptSummary(receipt), ["EXECUTING"]);
+    } else if (failure) {
+      failTask(taskId, t.owner_user_id, failure, "execute");
+    } else {
+      finish(taskId, t.owner_user_id, "BLOCKED", "Payment was not executed.", blockedSummary(ctx, taskId, "execute"), ["EXECUTING"]);
     }
   }
 
-  function failTask(taskId: string, ownerId: string, e: unknown) {
+  function failTask(taskId: string, ownerId: string, e: unknown, phase: Phase) {
+    const from = [ownedState(phase)];
     if (e instanceof PolicyError) {
       const state: TaskState = e.code === "LIMIT_REACHED" || e.code === "PROVIDER_FAILURE" ? "FAILED" : "BLOCKED";
-      event(taskId, "error", { text: `${e.code}: ${e.message}` });
-      finish(taskId, ownerId, state, `${e.code}: ${e.message}`, null);
+      if (getTaskById(taskId).state === from[0]) event(taskId, "error", { text: `${e.code}: ${e.message}` });
+      finish(taskId, ownerId, state, `${e.code}: ${e.message}`, null, from);
     } else {
       // Unexpected: record a generic message only (no stack, no payload, no secrets).
-      event(taskId, "error", { text: "Unexpected internal error." });
-      finish(taskId, ownerId, "FAILED", "INTERNAL: unexpected error", null);
+      if (getTaskById(taskId).state === from[0]) event(taskId, "error", { text: "Unexpected internal error." });
+      finish(taskId, ownerId, "FAILED", "INTERNAL: unexpected error", null, from);
     }
   }
 
@@ -251,7 +322,7 @@ export function createRunner(ctx: Ctx, llm: LlmClient, opts: { retryDelayMs?: nu
       const t = getTask(ctx, userId, taskId);
       if (t.state !== "AWAITING_APPROVAL" && t.state !== "RUNNING") throw new PolicyError("TASK_STATE", `A ${t.state.toLowerCase()} task cannot be cancelled.`);
       if (t.proposal_id) ctx.db.prepare("UPDATE proposals SET status='REJECTED' WHERE id=? AND owner_user_id=? AND status='PENDING'").run(t.proposal_id, userId);
-      finish(taskId, userId, "CANCELLED", null, "Cancelled by the student. No payment was made.");
+      finish(taskId, userId, "CANCELLED", null, "Cancelled by the student. No payment was made.", ["RUNNING", "AWAITING_APPROVAL"]);
       return getTask(ctx, userId, taskId);
     },
 
@@ -261,7 +332,7 @@ export function createRunner(ctx: Ctx, llm: LlmClient, opts: { retryDelayMs?: nu
         const p = ctx.db.prepare("SELECT expires_at, status FROM proposals WHERE id = ? AND owner_user_id = ?").get(t.proposal_id, userId) as { expires_at: string; status: string } | undefined;
         if (p && p.status === "PENDING" && Date.parse(p.expires_at) <= ctx.clock.now().getTime()) {
           ctx.db.prepare("UPDATE proposals SET status='SUPERSEDED' WHERE id = ? AND owner_user_id = ? AND status='PENDING'").run(t.proposal_id, userId);
-          finish(taskId, userId, "BLOCKED", "PROPOSAL_EXPIRED: the quote expired before approval. No payment was made. Start a new task for fresh quotes.", null);
+          finish(taskId, userId, "BLOCKED", "PROPOSAL_EXPIRED: the quote expired before approval. No payment was made. Start a new task for fresh quotes.", null, ["AWAITING_APPROVAL"]);
         }
       }
       return getTask(ctx, userId, taskId);
@@ -271,7 +342,11 @@ export function createRunner(ctx: Ctx, llm: LlmClient, opts: { retryDelayMs?: nu
       const rows = ctx.db.prepare("SELECT * FROM agent_tasks WHERE state IN ('RUNNING','EXECUTING')").all() as TaskRow[];
       for (const t of rows) {
         const paid = t.proposal_id ? ctx.db.prepare("SELECT id FROM payments WHERE proposal_id = ?").get(t.proposal_id) as { id: string } | undefined : undefined;
-        if (paid) { setTask(t.id, { payment_id: paid.id }); finish(t.id, t.owner_user_id, "COMPLETED", null, "Recovered after restart: the payment had completed."); }
+        if (paid) {
+          setTask(t.id, { payment_id: paid.id });
+          const receipt = receiptForProposal(ctx, t.proposal_id);
+          finish(t.id, t.owner_user_id, "COMPLETED", null, receipt ? receiptSummary(receipt) : "Recovered after restart: the payment had completed.");
+        }
         else finish(t.id, t.owner_user_id, "FAILED", "INTERRUPTED: the server restarted while the task was running. No payment was made. Start a new task.", null);
       }
     },

@@ -10,7 +10,7 @@ export default defineConfig({
   reporter: [["list"]],
   use: { baseURL: "http://127.0.0.1:8799", channel: "chrome", headless: true, trace: "retain-on-failure" },
   webServer: {
-    command: "rm -f data/e2e.sqlite* && APP_PORT=8799 APP_DB_PATH=data/e2e.sqlite APP_DEMO_MODE=1 APP_LOGIN_RATE_LIMIT=1000 APP_LLM_API_KEY= APP_LLM_MODEL= node --import tsx src/server/index.ts",
+    command: "rm -f data/e2e.sqlite* && APP_PORT=8799 APP_DB_PATH=data/e2e.sqlite APP_DEMO_MODE=1 APP_LOGIN_RATE_LIMIT=1000 APP_TASK_RATE_LIMIT=1000 APP_MUTATE_RATE_LIMIT=10000 APP_LLM_API_KEY= APP_LLM_MODEL= node --import tsx src/server/index.ts",
     url: "http://127.0.0.1:8799/api/config",
     reuseExistingServer: false,
     timeout: 60_000,

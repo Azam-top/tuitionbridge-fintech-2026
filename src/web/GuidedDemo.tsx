@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { api, ApiFailure, type Config, type Invoice, type TaskView } from "./api";
+import { api, ApiFailure, type Config } from "./api";
 import { Card, Chip } from "./components";
 import { explain } from "./friendly";
 
@@ -39,24 +39,12 @@ export const SCENARIOS: Scenario[] = [
   },
 ];
 
-const STEPS = ["Confirm invoice", "Plan", "Review and approve", "Receipt"];
-
-export function stepIndex(invoice: Invoice | null, task: TaskView | null): number {
-  const s = task?.task.state;
-  if (s === "COMPLETED") return 3;
-  if (s === "AWAITING_APPROVAL" || s === "EXECUTING") return 2;
-  if (s === "RUNNING") return 1;
-  if (invoice?.status === "CONFIRMED") return 1;
-  return 0;
-}
-
-export function GuidedDemo({ config, current, invoice, task, onLoaded, onError }: {
-  config: Config; current: string | null; invoice: Invoice | null; task: TaskView | null;
+export function GuidedDemo({ config, current, onLoaded, onError }: {
+  config: Config; current: string | null;
   onLoaded: (s: Scenario | { server: string; instruction?: string; key: string }) => void | Promise<void>; onError: (m: string) => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [more, setMore] = useState("all_late");
-  const step = stepIndex(invoice, task);
   const active = SCENARIOS.find((s) => s.key === current);
 
   async function load(s: Scenario | { key: string; server: string }) {
@@ -68,14 +56,7 @@ export function GuidedDemo({ config, current, invoice, task, onLoaded, onError }
   }
 
   return (
-    <Card id="demo" title="Guided demo" aside={<Chip tone="muted">local demo only</Chip>}>
-      <ol className="stepper" aria-label="Progress" data-testid="stepper">
-        {STEPS.map((s, i) => (
-          <li key={s} className={i < step ? "done" : i === step ? "now" : ""} aria-current={i === step ? "step" : undefined}>
-            <span className="dot" aria-hidden="true">{i < step ? "✓" : i + 1}</span> {s}
-          </li>
-        ))}
-      </ol>
+    <Card id="demo" title="Demo scenarios" aside={<Chip tone="muted">local demo only</Chip>}>
       <ul className="scenarios" role="list">
         {SCENARIOS.map((s) => (
           <li key={s.key} className={current === s.key ? "on" : ""}>

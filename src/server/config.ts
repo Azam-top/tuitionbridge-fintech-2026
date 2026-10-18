@@ -5,8 +5,12 @@ export interface AppConfig {
   port: number;
   dbPath: string;
   demoMode: boolean;
+  taskRateLimitPerMinute: number;
+  mutateRateLimitPerMinute: number;
   llmApiKey: string | null;
   llmModel: string | null;
+  /** Optional provider endpoint override; used to point the adapter at a local fake provider in tests. */
+  llmBaseUrl: string | null;
   llmMaxOutputTokens: number;
   taskTokenBudget: number;
   maxToolCalls: number;
@@ -33,6 +37,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     demoMode: env.APP_DEMO_MODE !== "0",
     llmApiKey: key ? key : null,
     llmModel: model ? model : null,
+    llmBaseUrl: env.APP_LLM_BASE_URL?.trim() || null,
     llmMaxOutputTokens: num(env.APP_LLM_MAX_OUTPUT_TOKENS, 8192),
     taskTokenBudget: num(env.APP_TASK_TOKEN_BUDGET, 80000),
     maxToolCalls: num(env.APP_MAX_TOOL_CALLS, 8),
@@ -43,6 +48,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     quoteTtlMs: num(env.APP_QUOTE_TTL_MS, 15 * 60_000),
     cookieSecure: env.APP_COOKIE_SECURE === "1",
     loginRateLimitPerMinute: num(env.APP_LOGIN_RATE_LIMIT, 10),
+    taskRateLimitPerMinute: num(env.APP_TASK_RATE_LIMIT, 12),
+    mutateRateLimitPerMinute: num(env.APP_MUTATE_RATE_LIMIT, 120),
   };
 }
 

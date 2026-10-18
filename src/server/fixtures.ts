@@ -34,7 +34,9 @@ export const DEMO_TUITION_TIYN = "50000000"; // KZT 500,000.00
 export const DEMO_USD_BALANCE_CENTS = "150000"; // USD 1,500.00
 export const DEMO_USD_BALANCE_INSUFFICIENT_CENTS = "90000"; // USD 900.00
 export const DEMO_USD_RESERVE_CENTS = "30000"; // USD 300.00
-export const DEMO_KZT_BALANCE_TIYN = "80000000"; // KZT 800,000.00 (untouched by the USD-funded flow)
+// The scenario is USD-funded only: the student holds no KZT, so there is no cheaper local-currency way to pay.
+// A direct-KZT funding option would need its own constraints (earmarks, local fees) and is not modelled.
+export const DEMO_KZT_BALANCE_TIYN = "0";
 export const DEMO_DEADLINE_HOURS = 48;
 export const MIN_KZT_TIYN = "1000000"; // KZT 10,000.00
 export const MAX_KZT_TIYN = "2000000000"; // KZT 20,000,000.00

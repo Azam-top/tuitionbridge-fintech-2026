@@ -51,7 +51,7 @@ export const TOOL_SPECS: Record<ToolName, ToolSpec> = {
   prepare_payment: {
     name: "prepare_payment",
     description:
-      "Create an immutable payment proposal for one feasible quote_id from the latest evaluate_routes result. This does NOT move money. A human must approve it afterwards.",
+      "Create an immutable payment proposal for one feasible quote_id from the latest evaluate_routes result. The server re-ranks the current quotes and rejects any quote that is not the best route for the stated preference. This does NOT move money. A human must approve it afterwards.",
     inputSchema: {
       type: "object",
       properties: {
@@ -167,7 +167,7 @@ export function runTool(env: ToolEnv, name: string, rawInput: unknown): ToolOutc
           data: {
             preference: pref, reserveUsdCents: a.reserve_usd_cents, bestQuoteId: res.best?.quoteId ?? null, noFeasibleRoute: res.best === null,
             routes: res.routes.map((r) => ({
-              quoteId: r.quoteId, provider: r.providerName, feasible: r.feasible, totalDebit: formatUsd(r.totalDebitCents), totalDebitCents: r.totalDebitCents,
+              quoteId: r.quoteId, provider: r.providerName, feasible: r.feasible, rate: r.rate, totalDebit: formatUsd(r.totalDebitCents), totalDebitCents: r.totalDebitCents,
               fee: formatUsd(r.feeCents), recipientWillReceive: formatKzt(r.recipientTiyn), roundingSurplus: formatKzt(r.surplusTiyn),
               usdAfterPayment: formatUsd(r.usdAfterCents), estArrivalAt: r.estArrivalAt, expiresAt: r.expiresAt,
               exclusions: r.exclusions.map((e) => ({ code: e.code, message: e.message })),

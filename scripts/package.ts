@@ -4,6 +4,7 @@
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join, relative } from "node:path";
+import { checkEvidenceConsistency, gitInfo } from "./lib/provenance";
 
 const STAGE_ROOT = "dist-submission/stage";
 const NAME = "tuitionbridge";
@@ -19,6 +20,17 @@ const EXTRA_FILES = ["artifacts/demo/tuitionbridge-demo-mock.mp4"]; // the 14 MB
 const EXCLUDE = [/node_modules/, /(^|\/)\.env$/, /\.sqlite/, /(^|\/)dist(\/|$)/, /test-results/, /playwright-report/, /(^|\/)\.git(\/|$)/, /artifacts\/tmp/, /\.vitest/, /passport/i];
 const missing: string[] = [];
 
+// ---- provenance: every artifact must trace to ONE clean source commit, and the sources must not have changed since ----
+const readJson = (p: string) => JSON.parse(readFileSync(p, "utf8")) as never;
+const problems = checkEvidenceConsistency({
+  manifest: readJson("artifacts/evidence/manifest.json"), testSummary: readJson("artifacts/evidence/test-summary.json"), evalMock: readJson("artifacts/evidence/eval-mock.json"),
+});
+if (problems.length && !process.argv.includes("--allow-inconsistent")) {
+  console.error("Refusing to package; artifacts are not traceable to one clean source commit:\n- " + problems.join("\n- ") + "\nRe-run the evidence pipeline on a clean tree (see docs/HANDOFF.md).");
+  process.exit(1);
+}
+const git = gitInfo();
+
 rmSync("dist-submission", { recursive: true, force: true });
 mkdirSync(stage, { recursive: true });
 const copy = (src: string) => {
@@ -26,6 +38,13 @@ const copy = (src: string) => {
   cpSync(src, join(stage, src), { recursive: true, filter: (s) => !EXCLUDE.some((r) => r.test(s.replace(/\\/g, "/"))) });
 };
 [...FILES, ...DIRS, ...EXTRA_FILES].forEach(copy);
+
+writeFileSync(join(stage, "PACKAGE_INFO.json"), JSON.stringify({
+  note: "sourceCommit is the commit the tests, evaluation and evidence were produced from. packagedAtCommit may be a later commit that only adds those artifacts and docs.",
+  sourceCommit: readJson("artifacts/evidence/manifest.json").sourceCommit, packagedAtCommit: git.head, sourceTreeDirtyAtPackaging: git.dirty,
+  generatedAt: new Date().toISOString(), consistencyProblems: problems,
+  liveEvaluation: readJson("artifacts/evidence/manifest.json").liveEvaluation, payments: "SIMULATED",
+}, null, 2) + "\n");
 
 // ---- secret / personal-data scan over everything staged ----
 const PATTERNS: [string, RegExp][] = [

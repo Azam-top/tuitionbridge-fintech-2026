@@ -3,9 +3,9 @@ import { newId, sha256Hex } from "../ids.js";
 import { PolicyError } from "../errors.js";
 import { type Tier, tierAllows } from "../auth.js";
 import { canonicalJson } from "../../shared/canonical.js";
-import { evaluateQuote, type Preference } from "../../shared/policy.js";
+import { evaluateQuote, evaluateRoutes, type Preference } from "../../shared/policy.js";
 import { getInvoice, validateInvoice } from "./invoices.js";
-import { getQuote } from "./quotes.js";
+import { getQuote, latestQuotesForInvoice } from "./quotes.js";
 import { getBalances } from "./ledger.js";
 import { audit } from "./audit.js";
 
@@ -37,6 +37,13 @@ export interface ProposalPayload {
   reserveCents: string;
   preference: Preference;
   proposalExpiresAt: string;
+  /** Evidence that the server ranked the current quote set and this quote won the stated objective. */
+  selection: {
+    basis: "server_ranking_v1";
+    objective: Preference;
+    candidateQuoteIds: string[];
+    rankedFeasibleQuoteIds: string[];
+  };
 }
 
 export interface ProposalView {
@@ -96,6 +103,12 @@ export function prepareProposal(ctx: Ctx, input: PrepareInput): ProposalView {
   if (!tierAllows(input.tier, "propose")) throw new PolicyError("FORBIDDEN_TIER", "Proposing a payment requires the propose tier.");
   const id = newId("prop");
   ctx.db.transaction(() => {
+    // Write-time guard: a proposal attributed to an agent task may only be created while that task is still running,
+    // so a cancelled or finished task can never gain a proposal from a late tool call.
+    if (input.taskId) {
+      const task = ctx.db.prepare("SELECT state FROM agent_tasks WHERE id = ? AND owner_user_id = ?").get(input.taskId, input.ownerId) as { state: string } | undefined;
+      if (!task || task.state !== "RUNNING") throw new PolicyError("TASK_STATE", "The task is no longer running, so no proposal was created.");
+    }
     const inv = getInvoice(ctx, input.ownerId, input.invoiceId);
     if (inv.status === "PAID") throw new PolicyError("INVOICE_ALREADY_PAID", "Invoice is already paid.");
     if (inv.status !== "CONFIRMED") throw new PolicyError("INVOICE_NOT_CONFIRMED", "Invoice is not confirmed.");
@@ -117,6 +130,28 @@ export function prepareProposal(ctx: Ctx, input: PrepareInput): ProposalView {
         codes: ev.exclusions.map((e) => e.code),
       });
     }
+    // The server, not the caller, decides which route is best for the stated objective. A feasible but
+    // non-optimal (or superseded) quote is rejected; the model cannot bypass the ranking by naming a quote.
+    const candidates = latestQuotesForInvoice(ctx, input.ownerId, inv.id);
+    const ranking = evaluateRoutes({
+      quotes: candidates, tuitionTiyn: BigInt(inv.amount_kzt_tiyn), deadlineAt: inv.due_at, now: now.toISOString(),
+      usdBalanceCents: BigInt(bal.usd.balanceCents), usdReserveCents: BigInt(input.reserveCents), preference: input.preference,
+    });
+    if (!candidates.some((c) => c.id === quote.id)) {
+      throw new PolicyError("QUOTE_SUPERSEDED", "That quote was replaced by a newer one from the same provider. Fetch and rank the current quotes.");
+    }
+    if (ranking.best?.quoteId !== quote.id) {
+      throw new PolicyError(
+        "ROUTE_NOT_OPTIMAL",
+        `Quote ${quote.id} is feasible but is not the ${input.preference} route. The best ${input.preference} feasible route is ${ranking.best?.quoteId ?? "none"}.`,
+        { objective: input.preference, bestQuoteId: ranking.best?.quoteId ?? null },
+      );
+    }
+    const selection: ProposalPayload["selection"] = {
+      basis: "server_ranking_v1", objective: input.preference,
+      candidateQuoteIds: candidates.map((c) => c.id).sort(),
+      rankedFeasibleQuoteIds: ranking.routes.filter((r) => r.feasible).map((r) => r.quoteId),
+    };
     const expiresAt = quote.expiresAt;
     const payload: ProposalPayload = {
       v: 1, ownerUserId: input.ownerId, invoiceId: inv.id, invoiceReference: inv.reference,
@@ -126,6 +161,7 @@ export function prepareProposal(ctx: Ctx, input: PrepareInput): ProposalView {
       surplusTiyn: ev.surplusTiyn, quoteId: quote.id, quoteVersion: quote.version, providerId: quote.providerId,
       providerName: quote.providerName, estArrivalAt: quote.estArrivalAt, deadlineAt: inv.due_at,
       quoteExpiresAt: quote.expiresAt, reserveCents: input.reserveCents, preference: input.preference, proposalExpiresAt: expiresAt,
+      selection,
     };
     const hash = hashPayload(payload);
     // A new proposal supersedes any older pending one for this invoice (approval for the old one becomes unusable).
