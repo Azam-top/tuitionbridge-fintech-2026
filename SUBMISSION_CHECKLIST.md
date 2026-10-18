@@ -9,11 +9,11 @@ Deadline: **20 Oct 2026, 23:59 Beijing = 20:59 Almaty**. Recommended: submit on 
 | Tests | Done (see measured totals below) | `tests/`, `e2e/`, `npm test`, `npm run test:e2e` |
 | Technical documentation | Done | `docs/ARCHITECTURE.md`, `docs/PROJECT_SPEC.md` |
 | Security assessment | Done (self-assessment, not an audit) | `docs/SECURITY.md` |
-| Sandbox logs / evidence | Done (MOCK agent, SIMULATED payments, redacted) | `artifacts/evidence/` (open `viewer.html`) |
-| Evaluation (30 cases) | Done: deterministic only | `eval/cases.json`, `artifacts/evidence/eval-mock.json` |
+| Sandbox logs / evidence | Done (sandbox: MOCK agent, SIMULATED payments, redacted) | `artifacts/evidence/` (open `viewer.html`) |
+| Evaluation (30 cases) | Done: deterministic, on the **sandbox** test data | `eval/cases.json`, `artifacts/evidence/eval-mock.json` |
 | Pitch deck + speaker notes | Done | `docs/deck/index.html`, `docs/deck/TuitionBridge_pitch.pdf`, `..._with_notes.pdf` |
 | Judge Q&A, demo script | Done | `docs/PITCH_QA.md`, `docs/DEMO_SCRIPT.md` |
-| Demo video (≤5 min) | **Exists, with caveats**: re-recorded 2026-10-18 from the redesigned UI, 1 min 42 s, MOCK agent, captions, no narration | `artifacts/demo/tuitionbridge-demo-mock.mp4` |
+| Demo video (≤5 min) | **Exists, with caveats**: re-recorded 2026-10-18; LIVE segment uses a LOCAL FAKE model provider (captioned) and the real NBK/Wise sources; SANDBOX segment; MOCK/fake model, captions only, no narration | `artifacts/demo/tuitionbridge-demo-mock.mp4` |
 | AI usage statement | Draft: **HUMAN must complete the review section** | `AI_USAGE.md` |
 | Dependency licenses | Done | `docs/DEPENDENCIES.md` |
 | Repository URL | Done (public) | <https://github.com/Azam-top/tuitionbridge-fintech-2026> |
@@ -21,7 +21,9 @@ Deadline: **20 Oct 2026, 23:59 Beijing = 20:59 Almaty**. Recommended: submit on 
 Measured at packaging time: see `artifacts/evidence/test-summary.json` (type check, unit/integration, browser) and `eval-mock.json`. Re-run `npm run test:summary && npm run eval && npm run evidence && npm run deck` after any change.
 
 ## B. Missing or unverified (do not call the package "competition-ready" until these are resolved or consciously accepted)
-1. **Live model run: NOT DONE (LIVE NOT RUN).** Needs your own key + model in a local `.env` and an explicit budget; then `npm run smoke:live` (spends credits). See `docs/LIVE_RUN.md`. Record the result in `docs/HANDOFF.md` and re-export evidence.
+1. **Real model run: NOT DONE (LIVE NOT RUN).** The live application cannot plan without one. Put your own key + model in a local `.env`, then `npm run smoke:live` (spends a few thousand tokens). See `docs/LIVE_RUN.md`. Record the result in `docs/HANDOFF.md` and re-export evidence.
+1a. **Real payment execution: NOT IMPLEMENTED.** The live mode issues an instruction and stores your own evidence; it needs confirmed provider access (e.g. a verified Wise business account and API token) before the app can create transfers.
+1b. **Your real data:** declare your funds, add your university's official payment details as a trusted recipient, enter your real invoice, and run the flow once on your machine.
 2. **Real-model evaluation: NOT DONE.** After the smoke test passes: `APP_EVAL_LIVE=1 npm run eval:live` (five-case pack, token/time ceilings). Report it separately from the deterministic results; failures are reported as failures.
 3. **Student evidence: NOT COLLECTED.** 5–10 consented, anonymized interviews; replace the TODOs on deck slides 2 and 10 with real counts. No banking or passport documents in the repository.
 4. **Human code review: NOT RECORDED.** The money algorithm, approval gate, tool loop and ledger transaction must be read and understood by the team; fill in `AI_USAGE.md`.
