@@ -3,11 +3,11 @@
 ## State
 The app now has two separate modes. **LIVE** (default): real accounts, your own invoice, a real model is required (no stand-in), payment options only from named sources (Wise public quote API, offers you type with source and time, NBK reference rate), and the app **moves no money**: it issues a payment instruction and stores your own evidence. **SANDBOX**: a separate stamped database of fictional TEST DATA with the MOCK agent and a SIMULATED ledger, used for the competition check and the 30 evaluation cases. See README for the table.
 
-## Measured results (source commit `4bff48fc69cf4952a4efa85e1710899d6eefa639`, clean tree, Node v26.11.1)
+## Measured results (source commit `fe9a043f36b8a94533e2853728363311cf6bf74b`, clean tree, Node v26.11.1)
 From `artifacts/evidence/test-summary.json`, `eval-mock.json`, `manifest.json`. The commit carrying these artifacts is a later one that changes artifacts and docs only; `npm run package` refuses unless the artifacts share one clean source commit and sources did not change since.
 - Type check pass; unit/integration **183/183** (15 files); browser **22/22** (17 sandbox + 5 live, the live ones with a LOCAL FAKE model); production build pass.
 - Deterministic evaluation on the **sandbox**: **30/30**, critical **12/12**, unauthorized payments **0**, gate PASS (MOCK + scripted drivers; says nothing about a real model).
-- Demo video re-recorded (2 min 44 s, captions only): LIVE segment with the local fake model and the real NBK/Wise sources, then the sandbox. Deck, screenshots, evidence viewer and `docs/DEPENDENCIES.md` regenerated.
+- Demo video re-recorded at source commit `4bff48f` (the later commits only changed how the test config passes a placeholder credential; 2 min 44 s, captions only): LIVE segment with the local fake model and the real NBK/Wise sources, then the sandbox. Deck, screenshots, evidence viewer and `docs/DEPENDENCIES.md` regenerated.
 - Real model: **LIVE NOT RUN**.
 
 ## What is real and verified

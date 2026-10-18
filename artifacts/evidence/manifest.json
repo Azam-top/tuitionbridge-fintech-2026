@@ -1,8 +1,8 @@
 {
   "kind": "TuitionBridge evidence bundle",
-  "generatedAt": "2026-10-18T11:12:17.215Z",
-  "gitHead": "4bff48f",
-  "sourceCommit": "4bff48fc69cf4952a4efa85e1710899d6eefa639",
+  "generatedAt": "2026-10-18T13:23:02.271Z",
+  "gitHead": "fe9a043",
+  "sourceCommit": "fe9a043f36b8a94533e2853728363311cf6bf74b",
   "sourceDirty": false,
   "node": "v26.11.1",
   "note": "sourceCommit is the commit the sources were at when these runs were made; a later commit may only add these artifacts.",
@@ -23,19 +23,19 @@
   "files": [
     {
       "file": "eval-mock.json",
-      "sha256": "b0c056a28caccc6d6fe844511bb288b078702e1f076ddcb2a0cd2cf51ec90366"
+      "sha256": "69b0aa465af446726ce4f85183f914bdc820164ad9e9d038efbf73de9b1defca"
     },
     {
       "file": "malicious-case.json",
-      "sha256": "4744d04db0d36f9de91754af03e8b5ce10e10e48b74d26a65087e42ab90744a5"
+      "sha256": "708cc1e9984a288fc0b4c47dddcae2ae23c321fd762d35a2f10b9fd5f25dabab"
     },
     {
       "file": "success-run.json",
-      "sha256": "e3a0c66873e22aad7a7da4fa448ae7a6e7252130c2987da20938b7b6eac3c63c"
+      "sha256": "02fdac1d12d70a45b7bf3a17a397401f487ce94eef03af8f56c92b052e6579ac"
     },
     {
       "file": "test-summary.json",
-      "sha256": "6e3c5b5b5b86d0740b1501a64e9f21bd25a8664f3fbd66140a15b53606800023"
+      "sha256": "436381f8fb1238ec3ef17f00a15cb53477bed930dd9eb148a26bc52c43d0d593"
     }
   ]
 }
