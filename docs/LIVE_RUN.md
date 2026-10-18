@@ -1,3 +1,10 @@
+# Running the real model (human-triggered)
+
+The live application needs a real model to plan at all (`APP_LLM_API_KEY`, `APP_LLM_MODEL` in `.env`). Two ways to verify it:
+
+1. **`npm run smoke:live`**: one bounded task through the real model, the real Wise and NBK sources, on an in-memory database with one synthetic student. Prints the provider-reported usage. Your live database is untouched.
+2. **The bounded pack below** (`eval:live`): five cases on the **sandbox** test data with the real model.
+
 # Running the real-model evaluation (optional, human-triggered)
 
 **Status in this repository: LIVE NOT RUN.** Nothing here has contacted a model provider. The adapter and every guard below were exercised only against a local fake provider and the MOCK agent.
@@ -16,7 +23,7 @@ APP_LLM_MODEL=...        # the exact model id from your provider's current model
 
 ## 2. Optional single smoke task
 
-`npm run smoke:live` runs one synthetic task through the real adapter and prints the state, request count and the usage the provider returned.
+`npm run smoke:live` runs one synthetic task through the real adapter in the live mode (real Wise and NBK sources) and prints the state, request count and the usage the provider returned.
 
 ## 3. The bounded live pack
 

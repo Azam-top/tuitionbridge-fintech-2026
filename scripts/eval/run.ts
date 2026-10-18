@@ -27,7 +27,7 @@ const PACK = LIVE ? (process.argv.find((a) => a.startsWith("--pack="))?.slice(7)
 interface CaseDef extends Case { category: string; title: string; critical?: boolean; live?: boolean; expect: Observed }
 const file = JSON.parse(readFileSync("eval/cases.json", "utf8")) as { version: string; cases: CaseDef[] };
 
-const config = loadConfig();
+const config = loadConfig({ ...process.env, APP_MODE: "sandbox" }); // the evaluation runs on the SANDBOX test data
 if (LIVE) {
   if (process.env.APP_EVAL_LIVE !== "1") { console.error("Refusing live evaluation: set APP_EVAL_LIVE=1 to confirm you accept real API spend."); process.exit(2); }
   if (agentMode(config) !== "LIVE") { console.error("LIVE EVALUATION NOT RUN: APP_LLM_API_KEY / APP_LLM_MODEL are not configured."); process.exit(2); }
