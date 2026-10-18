@@ -13,12 +13,12 @@ const HINTS: Record<string, string> = {
   CSRF: "Your session looks out of date. Reload the page and sign in again.",
   BAD_ORIGIN: "This request came from a different site and was refused.",
   FORBIDDEN_TIER: "This account is not allowed to do that (read-only or propose-only).",
-  INTENT_CONFLICT: "Please rewrite the instruction with one clear preference and a non-zero reserve.",
+  INTENT_CONFLICT: "Please rewrite the instruction with one clear preference and one non-zero USD reserve.",
   RESERVE_LOWERING: "The living-expense reserve cannot be lowered by the agent.",
   INSUFFICIENT_FUNDS: "Your USD balance does not cover this payment. Nothing was paid.",
   RESERVE_BREACH: "Paying would dip below the living-expense reserve. Nothing was paid.",
   DUPLICATE_PAYMENT: "This invoice has already been paid. Nothing further was charged.",
-  PROVIDER_FAILURE: "The model provider failed. Nothing was paid; you can retry the task.",
+  PROVIDER_FAILURE: "The model provider failed. A payment exists only if a receipt is shown; a recorded payment is never undone by this error.",
 };
 
 export function explain(e: unknown, fallback: string): string {

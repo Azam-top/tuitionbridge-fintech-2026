@@ -34,7 +34,7 @@ export function TaskPanel({ view, now, approvalMinutes, limits, onChanged, onErr
           Agent: <strong>{task.mode}</strong>{task.model ? ` (${task.model})` : ""}. Payments: <strong>SIMULATED</strong>.
           {task.mode === "MOCK" && " This run used the deterministic stand-in, not a live model."}
         </p>
-        {task.summary && <p className="agent-says" data-testid="agent-summary"><strong>Agent:</strong> {task.summary}</p>}
+        {task.summary && <p className="agent-says" data-testid="agent-summary"><strong>Summary:</strong> {task.summary}</p>}
         {task.error && task.state !== "CANCELLED" && <p className="alert" role="alert" data-testid="task-error">{task.error}</p>}
         <Usage task={task} limits={limits} />
       </Card>
@@ -200,7 +200,7 @@ function Timeline({ events }: { events: TaskView["events"] }) {
                 </Details>
               </>
             ) : (
-              <div className={e.kind === "assistant" ? "agent-text" : "muted"}>{e.kind === "assistant" ? "Agent: " : ""}{e.text}</div>
+              <div className={e.kind === "assistant" ? "agent-text" : "muted"}>{e.kind === "assistant" ? "Agent comment: " : ""}{e.text}</div>
             )}
           </li>
         ))}
