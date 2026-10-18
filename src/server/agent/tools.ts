@@ -167,7 +167,7 @@ export function runTool(env: ToolEnv, name: string, rawInput: unknown): ToolOutc
           data: {
             preference: pref, reserveUsdCents: a.reserve_usd_cents, bestQuoteId: res.best?.quoteId ?? null, noFeasibleRoute: res.best === null,
             routes: res.routes.map((r) => ({
-              quoteId: r.quoteId, provider: r.providerName, feasible: r.feasible, totalDebit: formatUsd(r.totalDebitCents), totalDebitCents: r.totalDebitCents,
+              quoteId: r.quoteId, provider: r.providerName, feasible: r.feasible, rate: r.rate, totalDebit: formatUsd(r.totalDebitCents), totalDebitCents: r.totalDebitCents,
               fee: formatUsd(r.feeCents), recipientWillReceive: formatKzt(r.recipientTiyn), roundingSurplus: formatKzt(r.surplusTiyn),
               usdAfterPayment: formatUsd(r.usdAfterCents), estArrivalAt: r.estArrivalAt, expiresAt: r.expiresAt,
               exclusions: r.exclusions.map((e) => ({ code: e.code, message: e.message })),

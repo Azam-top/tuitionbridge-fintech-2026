@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { api, ApiFailure, type Invoice } from "./api";
-import { Card } from "./components";
 
 function toBase64(buf: ArrayBuffer): string {
   let s = "";
@@ -28,7 +27,8 @@ export function ImportCard({ disabled, onImported, onError }: { disabled: boolea
   }
 
   return (
-    <Card id="import" title="Add another invoice (text or text-PDF)">
+    <details className="card tech" id="import">
+      <summary>Add another invoice (text or text PDF)</summary>
       <label className="field">
         <span>Paste invoice text</span>
         <textarea rows={4} value={text} onChange={(e) => setText(e.target.value)} maxLength={20000} placeholder={"Invoice No: ...\nRegistry ID: ...\nBeneficiary: ...\nAccount: KZ...\nAmount due: KZT ...\nDue date: 2026-10-14 09:48 +05:00"} data-testid="import-text" disabled={disabled || busy} />
@@ -41,6 +41,6 @@ export function ImportCard({ disabled, onImported, onError }: { disabled: boolea
         </label>
       </div>
       <p className="hint">Extracted values are only a draft: you review and confirm them. Missing or ambiguous fields are never guessed, and bank details are never filled in for you. Scanned or image-only PDFs are not supported.</p>
-    </Card>
+    </details>
   );
 }

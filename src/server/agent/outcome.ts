@@ -40,9 +40,12 @@ function lastFailure(ctx: Ctx, taskId: string): string | null {
   } catch { return null; }
 }
 
+/** UTC timestamp for prose: "2026-10-19 05:51 UTC". */
+const utc = (iso: string): string => `${iso.slice(0, 10)} ${iso.slice(11, 16)} UTC`;
+
 export function proposalSummary(p: ProposalPayload): string {
   return `Proposal ready for your approval: you would be debited ${formatUsd(p.totalDebitCents)} through ${p.providerName}, ` +
-    `and the university would receive ${formatKzt(p.recipientTiyn)} (estimated arrival ${p.estArrivalAt}, quote valid until ${p.quoteExpiresAt}). ` +
+    `and the university would receive ${formatKzt(p.recipientTiyn)} (estimated arrival ${utc(p.estArrivalAt)}, quote valid until ${utc(p.quoteExpiresAt)}). ` +
     "Nothing has been paid yet.";
 }
 

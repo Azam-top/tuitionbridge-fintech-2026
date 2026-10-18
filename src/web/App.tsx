@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiFailure, setCsrf, type Config, type StateResponse, type TaskView } from "./api";
-import { Card, Chip, ModeBadges, Row } from "./components";
+import { Card, ModeBadges } from "./components";
 import { InvoiceCard } from "./InvoiceCard";
 import { TaskPanel } from "./TaskPanel";
 import { ImportCard } from "./ImportCard";
 import { GuidedDemo, type Scenario } from "./GuidedDemo";
+import { Journey } from "./Journey";
 import { explain } from "./friendly";
-import { formatKzt, formatUsd } from "./format";
+import { formatUsd } from "./format";
 
 const EXAMPLES = [
   "Pay this invoice by its deadline, use the cheapest feasible route, and keep USD 300 for living costs.",
@@ -86,6 +87,12 @@ export function App() {
     taskId.current = null; setTask(null); setSt(null); setAuthed(false); setCsrf("");
   }
 
+  // The decision and the result lead the page; earlier or failed attempts sit after the invoice and plan cards.
+  const taskLeads = !!task && (task.task.state === "AWAITING_APPROVAL" || task.task.state === "EXECUTING" || task.task.state === "COMPLETED");
+  const taskPanel = task && st ? (
+    <TaskPanel view={task} now={st.now} approvalMinutes={config?.limits.approvalMinutes ?? 5} limits={config?.limits ?? { maxToolCalls: 8, maxModelRequests: 10 }} onChanged={() => { void refresh(); }} onError={onError} />
+  ) : null;
+
   if (authed === null) return <main className="shell"><p role="status">Loading…</p></main>;
   if (!authed) return <Login config={config} onDone={async (csrf) => { setCsrf(csrf); setError(null); await refresh(); }} />;
 
@@ -95,7 +102,7 @@ export function App() {
       <header className="top">
         <div>
           <h1>TuitionBridge</h1>
-          <p className="muted small">An agent that pays your tuition invoice only after you approve, and only while keeping your living funds.</p>
+          <p className="muted small">Pay your tuition on time without spending your living money. You approve every payment.</p>
         </div>
         <div className="top-right">
           <ModeBadges config={config} />
@@ -113,10 +120,9 @@ export function App() {
 
       <main className="grid">
         <aside className="stack">
-          <Funds st={st} />
           {config?.demoMode && (
             <GuidedDemo
-              config={config} current={scenarioKey} invoice={invoice} task={task}
+              config={config} current={scenarioKey}
               onLoaded={async (sc) => {
                 taskId.current = null; setTask(null); setError(null); setSelectedId(null); setScenarioKey(sc.key);
                 if ("instruction" in sc && sc.instruction) setInstruction(sc.instruction);
@@ -127,6 +133,9 @@ export function App() {
           )}
         </aside>
         <div className="stack">
+          <Journey invoice={invoice} task={task} />
+          <Budget st={st} />
+          {taskLeads && taskPanel}
           {invoices.length > 1 && (
             <label className="field">
               <span>Invoice</span>
@@ -139,11 +148,9 @@ export function App() {
             <InvoiceCard invoice={invoice} locked={taskIsActive} onChanged={() => { void refresh(); }} onError={onError} />
           ) : <Card title="Invoice"><p>No invoice yet.</p></Card>}
 
-          <ImportCard disabled={taskIsActive} onImported={(inv) => { setSelectedId(inv.id); setError(null); void refresh(); }} onError={onError} />
-
-          <Card id="instruction" title="Tell the agent what to do">
+          <Card id="instruction" title="Plan the payment">
             <label className="field">
-              <span>Your instruction (English; a Russian example is included)</span>
+              <span>What should the agent do? (English; a Russian example is included)</span>
               <textarea value={instruction} onChange={(e) => setInstruction(e.target.value)} rows={3} maxLength={500} data-testid="instruction" disabled={taskIsActive} />
             </label>
             <div className="chips">
@@ -154,33 +161,30 @@ export function App() {
               {invoice?.status !== "CONFIRMED" && invoice?.status !== "PAID" && <span className="muted small">Confirm the invoice first.</span>}
               {invoice?.status === "PAID" && <span className="muted small">This invoice is already paid.</span>}
             </div>
-            <p className="hint">The agent can read, compare and prepare. It cannot approve or lower your reserve. Money moves only after you press Approve.</p>
+            <p className="hint">The agent can read, compare and prepare. It cannot approve or lower your reserve; money moves only after you approve.</p>
           </Card>
 
-          {task && st && (
-            <TaskPanel view={task} now={st.now} approvalMinutes={config?.limits.approvalMinutes ?? 5} limits={config?.limits ?? { maxToolCalls: 8, maxModelRequests: 10 }} onChanged={() => { void refresh(); }} onError={onError} />
-          )}
+          {!taskLeads && taskPanel}
+
+          <ImportCard disabled={taskIsActive} onImported={(inv) => { setSelectedId(inv.id); setError(null); void refresh(); }} onError={onError} />
         </div>
       </main>
       <footer className="foot muted small">
-        Synthetic data only. Fictional university and providers. {config ? `Fixtures ${config.fixturesVersion}.` : ""} Quote arrival times are estimates, not guarantees.
+        Fictional university, providers and data. {config ? `Fixtures ${config.fixturesVersion}.` : ""}
       </footer>
     </div>
   );
 }
 
-function Funds({ st }: { st: StateResponse | null }) {
+function Budget({ st }: { st: StateResponse | null }) {
   if (!st) return null;
   const b = st.balances;
   return (
-    <Card id="funds" title="Your funds">
-      <dl className="rows" data-testid="funds">
-        <Row label="USD balance" strong testId="usd-balance">{formatUsd(b.usd.balanceCents)}</Row>
-        <Row label="USD kept for living costs" testId="usd-reserve">{formatUsd(b.usd.reserveCents)}</Row>
-        <Row label="USD available to pay" testId="usd-available">{formatUsd(b.usd.availableCents)}</Row>
-      </dl>
-      <p className="hint">{b.note}</p>
-    </Card>
+    <section className="budget" id="funds" aria-label="Your funds" data-testid="funds">
+      <div><span>USD balance</span><strong className="num" data-testid="usd-balance">{formatUsd(b.usd.balanceCents)}</strong></div>
+      <div><span>Kept for living costs</span><strong className="num" data-testid="usd-reserve">{formatUsd(b.usd.reserveCents)}</strong></div>
+      <div><span>Available to pay</span><strong className="num" data-testid="usd-available">{formatUsd(b.usd.availableCents)}</strong></div>
+    </section>
   );
 }
 

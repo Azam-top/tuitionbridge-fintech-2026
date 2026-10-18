@@ -221,4 +221,48 @@ test.describe("TuitionBridge browser flow (MOCK agent, SIMULATED payments)", () 
     await page.getByTestId("start-task").click();
     await expect(page.getByTestId("error-banner")).toContainText("rewrite the instruction");
   });
+  test("a non-USD reserve is refused with a clear message and nothing starts", async ({ page }) => {
+    await signIn(page);
+    await page.getByTestId("scenario-s1").click();
+    await page.getByTestId("confirm-invoice").click();
+    await page.getByTestId("instruction").fill("cheapest feasible route, keep EUR 500");
+    await page.getByTestId("start-task").click();
+    await expect(page.getByTestId("error-banner")).toContainText("USD");
+    await expect(page.getByTestId("task-panel")).toHaveCount(0);
+  });
+
+  test("mobile width: no horizontal scroll, one next step, decision reachable by keyboard", async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 740 });
+    await signIn(page);
+    await page.getByTestId("scenario-s1").click();
+    await expect(page.getByTestId("next-step")).toContainText("Check the invoice details");
+    await page.getByTestId("confirm-invoice").click();
+    await page.getByTestId("start-task").click();
+    await expect(page.getByTestId("approval-card")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("next-step")).toContainText("approve or reject");
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(overflow).toBeLessThanOrEqual(0);
+    // keyboard: the approve button can be focused and shows a visible focus ring
+    // focus moves to the decision when it appears; one Tab reaches Approve, and the focus ring is visible
+    await page.keyboard.press("Tab");
+    await expect(page.getByTestId("approve-btn")).toBeFocused();
+    const outline = await page.getByTestId("approve-btn").evaluate((el) => getComputedStyle(el).outlineStyle);
+    expect(outline).not.toBe("none");
+    await page.keyboard.press("Enter");
+    await expect(page.getByTestId("task-state")).toContainText("Completed", { timeout: 15_000 });
+    await expect(page.getByTestId("receipt-debited")).toContainText("USD 1,010.00");
+  });
+
+  test("technical details are collapsed by default and the fingerprint is still available", async ({ page }) => {
+    await signIn(page);
+    await page.getByTestId("scenario-s1").click();
+    await page.getByTestId("confirm-invoice").click();
+    await page.getByTestId("start-task").click();
+    await expect(page.getByTestId("approval-card")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("tech-panel")).not.toHaveAttribute("open", "");
+    await expect(page.getByTestId("timeline")).toBeHidden();
+    await page.getByTestId("tech-panel").locator(":scope > summary").click();
+    await expect(page.getByTestId("timeline")).toBeVisible();
+    await expect(page.getByTestId("timeline")).toContainText("prepare_payment");
+  });
 });
