@@ -21,8 +21,8 @@ Deadline: **20 Oct 2026, 23:59 Beijing = 20:59 Almaty**. Recommended: submit on 
 Measured at packaging time: see `artifacts/evidence/test-summary.json` (type check, unit/integration, browser) and `eval-mock.json`. Re-run `npm run test:summary && npm run eval && npm run evidence && npm run deck` after any change.
 
 ## B. Missing or unverified (do not call the package "competition-ready" until these are resolved or consciously accepted)
-1. **Live model run: NOT DONE.** Needs a legitimate key + model in `.env`, then `npm run smoke:live` (spends credits). Record the result in `docs/HANDOFF.md` and re-export evidence.
-2. **Real-model evaluation: NOT DONE.** After the smoke test passes: `APP_EVAL_LIVE=1 npm run eval:live -- --max-cases=6`. Report it separately from the deterministic results.
+1. **Live model run: NOT DONE (LIVE NOT RUN).** Needs your own key + model in a local `.env` and an explicit budget; then `npm run smoke:live` (spends credits). See `docs/LIVE_RUN.md`. Record the result in `docs/HANDOFF.md` and re-export evidence.
+2. **Real-model evaluation: NOT DONE.** After the smoke test passes: `APP_EVAL_LIVE=1 npm run eval:live` (five-case pack, token/time ceilings). Report it separately from the deterministic results; failures are reported as failures.
 3. **Student evidence: NOT COLLECTED.** 5–10 consented, anonymized interviews; replace the TODOs on deck slides 2 and 10 with real counts. No banking or passport documents in the repository.
 4. **Human code review: NOT RECORDED.** The money algorithm, approval gate, tool loop and ledger transaction must be read and understood by the team; fill in `AI_USAGE.md`.
 5. **Narrated demo / rehearsal: NOT DONE.** The recording has captions only. Rehearse the spoken script in `docs/DEMO_SCRIPT.md` aloud with timing (≤5 min; deck ≤10 min).

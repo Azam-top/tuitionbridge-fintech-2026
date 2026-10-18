@@ -12,8 +12,14 @@ import { resetDemo } from "../src/server/services/seed";
 import { createRunner } from "../src/server/agent/runner";
 import { MockLlm } from "../src/server/agent/mock-llm";
 import { buildApp } from "../src/server/http/app";
+import { readFileSync } from "node:fs";
+import { assessLiveReport } from "./lib/provenance";
 
 if (!existsSync("dist/web/index.html")) { console.error("Run `npm run build` first."); process.exit(1); }
+if (!existsSync("artifacts/evidence/eval-mock.json") || !existsSync("artifacts/evidence/viewer.html")) { console.error("Run `npm run evidence` first: the captions quote the measured evaluation."); process.exit(1); }
+// Captions quote MEASURED values from the evidence bundle, never typed-in numbers.
+const evalMock = JSON.parse(readFileSync("artifacts/evidence/eval-mock.json", "utf8")) as { passed: number; denominator: number; criticalGates: { passed: number; total: number } };
+const liveStatus = assessLiveReport(existsSync("artifacts/evidence/eval-live.json") ? JSON.parse(readFileSync("artifacts/evidence/eval-live.json", "utf8")) : null).status;
 const PORT = 8801;
 const BASE = `http://127.0.0.1:${PORT}`;
 const config = loadConfig({ APP_DEMO_MODE: "1", APP_LOGIN_RATE_LIMIT: "1000", APP_PORT: String(PORT) });
@@ -73,7 +79,9 @@ await page.getByTestId("instruction").scrollIntoViewIfNeeded();
 await pause(3500);
 await page.getByTestId("start-task").click();
 await page.getByTestId("approval-card").waitFor();
-await pause(800);
+await page.getByTestId("next-step").scrollIntoViewIfNeeded();
+await caption(page, "One clear next step at every stage: here, approve or reject the exact payment");
+await pause(3500);
 await page.getByTestId("intent").scrollIntoViewIfNeeded();
 await caption(page, "The agent understood: cheapest, USD 300.00 reserve it cannot lower, deadline and beneficiary fixed by the invoice");
 await pause(4500);
@@ -93,8 +101,9 @@ await pause(6500);
 await page.getByTestId("usd-balance").scrollIntoViewIfNeeded();
 await caption(page, "The balance now reads USD 490.00: the USD 300.00 reserve was preserved");
 await pause(4000);
+await page.getByTestId("tech-panel").locator(":scope > summary").click();
 await page.getByTestId("timeline").scrollIntoViewIfNeeded();
-await caption(page, "Every step is an actual tool event stored in the database, not generated narration");
+await caption(page, "Technical details: every step is an actual tool event stored in the database, not generated narration");
 await pause(5000);
 
 // ---- scenario 3: malicious invoice ----
@@ -121,10 +130,10 @@ await page.goto("file://" + resolve("artifacts/evidence/viewer.html"));
 await caption(page, "REPLAY of recorded MOCK runs: tool trace, approval record, ledger before/after, receipt");
 await pause(4500);
 await page.getByRole("tab", { name: "Evaluation (deterministic)" }).click();
-await caption(page, "Deterministic evaluation: 30 fixed cases incl. 12 critical security cases. Real-model evaluation was NOT run");
+await caption(page, `Deterministic evaluation: ${evalMock.passed}/${evalMock.denominator} fixed cases, critical ${evalMock.criticalGates.passed}/${evalMock.criticalGates.total}. ${liveStatus === "VERIFIED" ? "A real-model evaluation report is included" : "Real-model evaluation: NOT RUN"}`);
 await pause(7000);
 await page.getByRole("tab", { name: "Manifest" }).click();
-await caption(page, "Limits: MOCK agent in this video, live model not verified, payments simulated, no real student interviews yet");
+await caption(page, `Limits: MOCK agent in this video${liveStatus === "VERIFIED" ? "" : ", live model not verified"}, payments simulated, no real student interviews yet`);
 await pause(6000);
 
 await context.close();
