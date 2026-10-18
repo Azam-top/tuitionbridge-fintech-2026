@@ -7,17 +7,19 @@ const STATUS_TEXT: Record<Invoice["status"], { tone: "ok" | "warn" | "bad" | "in
   DRAFT: { tone: "warn", text: "Needs your confirmation" },
   BLOCKED: { tone: "bad", text: "Blocked: needs correction" },
   CONFIRMED: { tone: "ok", text: "Confirmed by you" },
+  INSTRUCTED: { tone: "info", text: "Payment instruction issued" },
   PAID: { tone: "info", text: "Paid (simulated)" },
 };
 
 interface Props {
   invoice: Invoice;
   locked: boolean; // a task is active: edits would invalidate it
+  live: boolean; // live mode: the recipient is linked from the user's attested recipients, not typed
   onChanged: () => void;
   onError: (m: string) => void;
 }
 
-export function InvoiceCard({ invoice, locked, onChanged, onError }: Props) {
+export function InvoiceCard({ invoice, locked, live, onChanged, onError }: Props) {
   const [editing, setEditing] = useState(false);
   const [f, setF] = useState(() => toForm(invoice));
   const [busy, setBusy] = useState(false);
@@ -50,7 +52,9 @@ export function InvoiceCard({ invoice, locked, onChanged, onError }: Props) {
         <>
           <dl className="rows" data-testid="invoice-fields">
             <Row label="Beneficiary">{invoice.beneficiaryName}</Row>
-            <Row label="Recipient registry ID">{invoice.recipientRegistryId}</Row>
+            {live
+              ? <Row label="Trusted recipient">{invoice.recipientRegistryId ? "Matched to a recipient you attested" : "Not matched to any recipient you attested"}</Row>
+              : <Row label="Recipient registry ID">{invoice.recipientRegistryId}</Row>}
             <Row label="Beneficiary account"><code>{invoice.beneficiaryAccount}</code></Row>
             <Row label="Amount due" strong>{/^\d+$/.test(invoice.amountKztTiyn) ? formatKzt(invoice.amountKztTiyn) : "(missing)"}</Row>
             <Row label="Deadline">{invoice.dueAt ? fmtTime(invoice.dueAt) : "(missing)"}</Row>
@@ -68,7 +72,7 @@ export function InvoiceCard({ invoice, locked, onChanged, onError }: Props) {
               {invoice.issues.map((i, k) => (<li key={k}><strong>{i.code.replace(/_/g, " ")}</strong>: {i.message}</li>))}
             </ul>
           )}
-          {invoice.status !== "PAID" && (
+          {invoice.status !== "PAID" && invoice.status !== "INSTRUCTED" && (
             <div className="actions">
               <button className="btn" onClick={() => setEditing(true)} disabled={busy || locked} title={locked ? "Finish or cancel the active task before editing." : undefined}>Edit / correct</button>
               {invoice.status !== "CONFIRMED" && (
@@ -82,7 +86,7 @@ export function InvoiceCard({ invoice, locked, onChanged, onError }: Props) {
       ) : (
         <form className="form" onSubmit={(e) => { e.preventDefault(); void save(); }}>
           <Field label="Reference" value={f.reference} onChange={(v) => setF({ ...f, reference: v })} />
-          <Field label="Recipient registry ID" value={f.registry} onChange={(v) => setF({ ...f, registry: v })} />
+          {!live && <Field label="Recipient registry ID" value={f.registry} onChange={(v) => setF({ ...f, registry: v })} />}
           <Field label="Beneficiary name" value={f.name} onChange={(v) => setF({ ...f, name: v })} />
           <Field label="Beneficiary account" value={f.account} onChange={(v) => setF({ ...f, account: v })} />
           <Field label="Amount due (KZT)" value={f.amount} onChange={(v) => setF({ ...f, amount: v })} inputMode="decimal" />

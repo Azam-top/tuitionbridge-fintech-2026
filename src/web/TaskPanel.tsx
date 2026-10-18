@@ -2,20 +2,22 @@ import { useEffect, useRef, useState } from "react";
 import { explain } from "./friendly";
 import { api, ApiFailure, type Proposal, type Receipt, type RouteRow, type TaskView } from "./api";
 import { Card, Chip, Details, Row } from "./components";
+import { InstructionCard, PROVENANCE_LABEL } from "./LivePanels";
 import { fmtRelative, fmtTime, formatKzt, formatUsd } from "./format";
 
 const STATE_TEXT: Record<string, { tone: "ok" | "warn" | "bad" | "info" | "muted"; text: string }> = {
   RUNNING: { tone: "info", text: "Agent is working" },
   AWAITING_APPROVAL: { tone: "warn", text: "Waiting for your approval" },
   EXECUTING: { tone: "info", text: "Executing after your approval" },
+  APPROVED: { tone: "ok", text: "Approved: instruction issued" },
   COMPLETED: { tone: "ok", text: "Completed (simulated)" },
   BLOCKED: { tone: "bad", text: "Blocked: nothing was paid" },
   FAILED: { tone: "bad", text: "Failed: nothing was paid unless a receipt is shown" },
   CANCELLED: { tone: "muted", text: "Cancelled" },
 };
 
-export function TaskPanel({ view, now, approvalMinutes, limits, onChanged, onError }: { view: TaskView; now: string; approvalMinutes: number; limits: { maxToolCalls: number; maxModelRequests: number }; onChanged: () => void; onError: (m: string) => void }) {
-  const { task, events, proposal, receipt } = view;
+export function TaskPanel({ view, live, now, approvalMinutes, limits, onChanged, onError }: { view: TaskView; live: boolean; now: string; approvalMinutes: number; limits: { maxToolCalls: number; maxModelRequests: number }; onChanged: () => void; onError: (m: string) => void }) {
+  const { task, events, proposal, receipt, instruction } = view;
   const st = STATE_TEXT[task.state] ?? { tone: "muted" as const, text: task.state };
   const evalEvent = [...events].reverse().find((e) => e.tool === "evaluate_routes" && e.ok);
   const routes = (evalEvent?.output?.routes as RouteRow[] | undefined) ?? null;
@@ -35,8 +37,9 @@ export function TaskPanel({ view, now, approvalMinutes, limits, onChanged, onErr
       </Card>
 
       {receipt && <ReceiptCard receipt={receipt} />}
-      {routes && <Routes routes={routes} best={best} proposal={proposal} now={now} />}
-      {task.state === "AWAITING_APPROVAL" && proposal && <ApprovalCard taskId={task.id} proposal={proposal} now={now} approvalMinutes={approvalMinutes} onChanged={onChanged} onError={onError} />}
+      {instruction && <InstructionCard instruction={instruction} onChanged={onChanged} onError={onError} />}
+      {routes && <Routes routes={routes} best={best} proposal={proposal} now={now} live={live} />}
+      {task.state === "AWAITING_APPROVAL" && proposal && <ApprovalCard taskId={task.id} proposal={proposal} live={live} now={now} approvalMinutes={approvalMinutes} onChanged={onChanged} onError={onError} />}
       {task.state === "EXECUTING" && <p role="status" className="muted">Recording your approved payment in the sandbox ledger…</p>}
 
       <details className="card tech" data-testid="tech-panel">
@@ -77,9 +80,9 @@ function Usage({ task, limits }: { task: TaskView["task"]; limits: { maxToolCall
   );
 }
 
-function Routes({ routes, best, proposal, now }: { routes: RouteRow[]; best: string | null; proposal: Proposal | null; now: string }) {
+function Routes({ routes, best, proposal, now, live }: { routes: RouteRow[]; best: string | null; proposal: Proposal | null; now: string; live: boolean }) {
   return (
-    <Card id="routes" title="Compare routes" aside={<span className="muted small">Simulated quotes; arrival times are estimates</span>}>
+    <Card id="routes" title="Compare routes" aside={<span className="muted small">{live ? "Arrival times are estimates" : "Simulated quotes; arrival times are estimates"}</span>}>
       <div className="routes" data-testid="routes-table">
         {routes.map((r) => {
           const kind = r.feasible ? (r.quoteId === best ? "best" : "ok") : "excluded";
@@ -97,6 +100,7 @@ function Routes({ routes, best, proposal, now }: { routes: RouteRow[]; best: str
                 <div><dt>USD left after paying</dt><dd className="num">{r.usdAfterPayment}</dd></div>
                 <div><dt>Estimated arrival</dt><dd title={r.estArrivalAt}>{fmtTime(r.estArrivalAt)} <small className="muted">({fmtRelative(r.estArrivalAt, now)})</small></dd></div>
                 <div><dt>Quote valid until</dt><dd>{fmtTime(r.expiresAt)}</dd></div>
+                {r.source && <div><dt>Source</dt><dd>{PROVENANCE_LABEL[r.source] ?? r.source}</dd></div>}
               </dl>
               {!r.feasible && (
                 <ul className="reasons" aria-label="Why this route is excluded">
@@ -108,12 +112,12 @@ function Routes({ routes, best, proposal, now }: { routes: RouteRow[]; best: str
         })}
       </div>
       {!best && <p className="alert" role="alert" data-testid="no-route">No route qualifies, so no payment was proposed.</p>}
-      {proposal && <p className="muted small">Each provider charges a fixed USD fee at its own rate; no other FX margin is added.</p>}
+      {proposal && <p className="muted small">Each option is a fixed USD fee at its own rate; no other FX margin is added by this app.</p>}
     </Card>
   );
 }
 
-function ApprovalCard({ taskId, proposal, now, approvalMinutes, onChanged, onError }: { taskId: string; proposal: Proposal; now: string; approvalMinutes: number; onChanged: () => void; onError: (m: string) => void }) {
+function ApprovalCard({ taskId, proposal, live, now, approvalMinutes, onChanged, onError }: { taskId: string; proposal: Proposal; live: boolean; now: string; approvalMinutes: number; onChanged: () => void; onError: (m: string) => void }) {
   const p = proposal.payload;
   const clicked = useRef(false); // synchronous double-click guard; the server remains authoritative
   const [busy, setBusy] = useState(false);
@@ -157,7 +161,8 @@ function ApprovalCard({ taskId, proposal, now, approvalMinutes, onChanged, onErr
           <dl className="rows">
             <Row label="Recipient will receive" strong testId="will-receive"><span className="num">{formatKzt(p.recipientTiyn)}</span>{p.surplusTiyn !== "0" && <small className="muted"> (includes {formatKzt(p.surplusTiyn)} rounding surplus)</small>}</Row>
             <Row label="Tuition due"><span className="num">{formatKzt(p.tuitionTiyn)}</span></Row>
-            <Row label="Route (simulated provider)">{p.providerName}</Row>
+            <Row label={live ? "Route" : "Route (simulated provider)"}>{p.providerName}</Row>
+            <Row label="Where this offer came from" testId="offer-source">{PROVENANCE_LABEL[p.quoteProvenance] ?? p.quoteProvenance}{p.quoteObservedAt ? `, seen ${fmtTime(p.quoteObservedAt)}` : ""}{p.quoteSourceNote ? `: ${p.quoteSourceNote}` : ""}</Row>
             <Row label="Rate (KZT per USD)"><span className="num">{p.rate}</span></Row>
             <Row label="USD to be converted"><span className="num">{formatUsd(p.principalCents)}</span></Row>
             <Row label="Provider fee (fixed, USD)"><span className="num">{formatUsd(p.feeCents)}</span></Row>
@@ -171,14 +176,14 @@ function ApprovalCard({ taskId, proposal, now, approvalMinutes, onChanged, onErr
           <dl className="rows">
             <Row label="Invoice deadline" testId="deadline">{fmtTime(p.deadlineAt)}</Row>
             <Row label="Estimated arrival (an estimate, not a guarantee)">{fmtTime(p.estArrivalAt)}</Row>
-            <Row label="Quote expires" testId="quote-expiry">{fmtTime(p.quoteExpiresAt)} <small className="muted">({fmtRelative(p.quoteExpiresAt, now)})</small></Row>
+            <Row label={live ? "Offer valid until" : "Quote expires"} testId="quote-expiry">{fmtTime(p.quoteExpiresAt)} <small className="muted">({fmtRelative(p.quoteExpiresAt, now)})</small></Row>
             <Row label="Your approval stays valid for" testId="approval-expiry">{approvalMinutes} minutes after you approve, and never beyond the quote expiry</Row>
           </dl>
         </section>
       </div>
       <p className="hint">Approving binds exactly the figures above. If anything changes, a new proposal and a new approval are required. Only you can approve; the agent cannot.</p>
       <div className="actions">
-        <button className="btn btn-primary btn-lg" onClick={approve} disabled={busy} data-testid="approve-btn">Approve and pay (simulated)</button>
+        <button className="btn btn-primary btn-lg" onClick={approve} disabled={busy} data-testid="approve-btn">{live ? "Approve and issue payment instruction" : "Approve and pay (simulated)"}</button>
         <button className="btn btn-lg" onClick={reject} disabled={busy} data-testid="reject-btn">Reject</button>
       </div>
       <details className="inline-details">

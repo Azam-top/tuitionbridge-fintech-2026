@@ -159,3 +159,15 @@ textarea { resize: vertical; }
 
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
 @media (forced-colors: active) { .route-best, .next { border-width: 3px; } }
+
+/* live vs sandbox */
+.grid.single { grid-template-columns: minmax(0, 1fr); max-width: 860px; margin: 0 auto; }
+.sandbox-banner { background: var(--amber-l); border: 1px solid #ecce8c; color: var(--amber); border-radius: var(--radius); padding: 9px 14px; margin: 0 0 12px; font-size: .92rem; }
+.card.setup { border-left: 5px solid var(--red); margin-bottom: 12px; }
+.card.setup h2 { color: var(--red); margin-bottom: .3rem; }
+.plain { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 10px; }
+.plain li { padding: 8px 0; border-top: 1px solid var(--line-2); }
+.plain li.expired { opacity: .65; }
+.tech .form { padding: 0 0 4px; }
+.stepper-5 { grid-template-columns: repeat(5, 1fr); }
+@media (max-width: 760px) { .stepper-5 { grid-template-columns: 1fr 1fr; } }

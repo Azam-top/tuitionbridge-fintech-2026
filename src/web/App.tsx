@@ -6,6 +6,7 @@ import { TaskPanel } from "./TaskPanel";
 import { ImportCard } from "./ImportCard";
 import { GuidedDemo, type Scenario } from "./GuidedDemo";
 import { Journey } from "./Journey";
+import { FundsEditor, NewInvoiceCard, OffersCard, RecipientsCard, SetupBanner } from "./LivePanels";
 import { explain } from "./friendly";
 import { formatUsd } from "./format";
 
@@ -87,10 +88,14 @@ export function App() {
     taskId.current = null; setTask(null); setSt(null); setAuthed(false); setCsrf("");
   }
 
+  const live = config?.appMode === "live";
+  const recipients = st?.recipients ?? [];
+  const offers = (invoice && st?.offers[invoice.id]) || [];
+  const setupDone = !!st && st.balances.usd.balanceCents !== "0" && recipients.length > 0;
   // The decision and the result lead the page; earlier or failed attempts sit after the invoice and plan cards.
   const taskLeads = !!task && (task.task.state === "AWAITING_APPROVAL" || task.task.state === "EXECUTING" || task.task.state === "COMPLETED");
   const taskPanel = task && st ? (
-    <TaskPanel view={task} now={st.now} approvalMinutes={config?.limits.approvalMinutes ?? 5} limits={config?.limits ?? { maxToolCalls: 8, maxModelRequests: 10 }} onChanged={() => { void refresh(); }} onError={onError} />
+    <TaskPanel view={task} live={live} now={st.now} approvalMinutes={config?.limits.approvalMinutes ?? 5} limits={config?.limits ?? { maxToolCalls: 8, maxModelRequests: 10 }} onChanged={() => { void refresh(); }} onError={onError} />
   ) : null;
 
   if (authed === null) return <main className="shell"><p role="status">Loading…</p></main>;
@@ -110,6 +115,13 @@ export function App() {
         </div>
       </header>
 
+      {config?.appMode === "sandbox" && (
+        <div className="sandbox-banner" role="note" data-testid="sandbox-banner">
+          <strong>SANDBOX · TEST DATA.</strong> Fictional university, providers and users, with payments in a simulated ledger. This is the separate competition check, not the real application mode.
+        </div>
+      )}
+      <SetupBanner config={config} />
+
       <div aria-live="polite" className="toast-area">
         {error && (
           <div className="alert" role="alert" data-testid="error-banner">
@@ -118,9 +130,9 @@ export function App() {
         )}
       </div>
 
-      <main className="grid">
-        <aside className="stack">
-          {config?.demoMode && (
+      <main className={live ? "grid single" : "grid"}>
+        {config?.demoMode && (
+          <aside className="stack">
             <GuidedDemo
               config={config} current={scenarioKey}
               onLoaded={async (sc) => {
@@ -130,11 +142,13 @@ export function App() {
               }}
               onError={onError}
             />
-          )}
-        </aside>
+          </aside>
+        )}
         <div className="stack">
-          <Journey invoice={invoice} task={task} />
-          <Budget st={st} />
+          <Journey invoice={invoice} task={task} ctx={{ config, setupDone, offerCount: offers.filter((o) => !o.expired).length }} />
+          <Budget st={st} live={live} />
+          {live && st && <FundsEditor key={st.balances.usd.balanceCents + st.balances.usd.reserveCents} balances={st.balances} locked={taskIsActive} onSaved={() => { setError(null); void refresh(); }} onError={onError} />}
+          {live && <RecipientsCard recipients={recipients} onChanged={() => { setError(null); void refresh(); }} onError={onError} />}
           {taskLeads && taskPanel}
           {invoices.length > 1 && (
             <label className="field">
@@ -145,8 +159,11 @@ export function App() {
             </label>
           )}
           {invoice ? (
-            <InvoiceCard invoice={invoice} locked={taskIsActive} onChanged={() => { void refresh(); }} onError={onError} />
+            <InvoiceCard invoice={invoice} locked={taskIsActive} live={live} onChanged={() => { void refresh(); }} onError={onError} />
           ) : <Card title="Invoice"><p>No invoice yet.</p></Card>}
+
+          {live && !invoices.length && <NewInvoiceCard recipients={recipients} onCreated={(inv) => { setSelectedId(inv.id); setError(null); void refresh(); }} onError={onError} />}
+          {live && invoice?.status === "CONFIRMED" && config && <OffersCard invoice={invoice} offers={offers} reference={st?.reference ?? null} config={config} onChanged={() => { setError(null); void refresh(); }} onError={onError} />}
 
           <Card id="instruction" title="Plan the payment">
             <label className="field">
@@ -157,31 +174,33 @@ export function App() {
               {EXAMPLES.map((ex, i) => (<button key={i} className="chip-btn" onClick={() => setInstruction(ex)} disabled={taskIsActive}>Example {i + 1}</button>))}
             </div>
             <div className="actions">
-              <button className="btn btn-primary" onClick={start} disabled={starting || taskIsActive || invoice?.status !== "CONFIRMED"} data-testid="start-task">Plan my payment</button>
-              {invoice?.status !== "CONFIRMED" && invoice?.status !== "PAID" && <span className="muted small">Confirm the invoice first.</span>}
-              {invoice?.status === "PAID" && <span className="muted small">This invoice is already paid.</span>}
+              <button className="btn btn-primary" onClick={start} disabled={starting || taskIsActive || invoice?.status !== "CONFIRMED" || config?.agentStatus === "NOT_CONFIGURED"} data-testid="start-task">Plan my payment</button>
+              {invoice?.status !== "CONFIRMED" && invoice?.status !== "PAID" && invoice?.status !== "INSTRUCTED" && <span className="muted small">Confirm the invoice first.</span>}
+              {(invoice?.status === "PAID" || invoice?.status === "INSTRUCTED") && <span className="muted small">{invoice.status === "PAID" ? "This invoice is already paid." : "A payment instruction was already issued for this invoice."}</span>}
+              {config?.agentStatus === "NOT_CONFIGURED" && <span className="muted small">Planning is disabled until a model is configured.</span>}
             </div>
-            <p className="hint">The agent can read, compare and prepare. It cannot approve or lower your reserve; money moves only after you approve.</p>
+            <p className="hint">The agent can read, compare and prepare. It cannot approve or lower your reserve; {live ? "after you approve, the app issues a payment instruction and moves no money." : "money moves only after you approve."}</p>
           </Card>
 
           {!taskLeads && taskPanel}
 
+          {live && invoices.length > 0 && <NewInvoiceCard recipients={recipients} defaultOpen={false} onCreated={(inv) => { setSelectedId(inv.id); setError(null); void refresh(); }} onError={onError} />}
           <ImportCard disabled={taskIsActive} onImported={(inv) => { setSelectedId(inv.id); setError(null); void refresh(); }} onError={onError} />
         </div>
       </main>
       <footer className="foot muted small">
-        Fictional university, providers and data. {config ? `Fixtures ${config.fixturesVersion}.` : ""}
+        {live ? "Live mode: your own data. The app issues payment instructions and never moves money." : `Fictional university, providers and data. Fixtures ${config?.fixturesVersion ?? ""}.`}
       </footer>
     </div>
   );
 }
 
-function Budget({ st }: { st: StateResponse | null }) {
+function Budget({ st, live }: { st: StateResponse | null; live: boolean }) {
   if (!st) return null;
   const b = st.balances;
   return (
     <section className="budget" id="funds" aria-label="Your funds" data-testid="funds">
-      <div><span>USD balance</span><strong className="num" data-testid="usd-balance">{formatUsd(b.usd.balanceCents)}</strong></div>
+      <div><span>{live ? "USD you declared" : "USD balance"}</span><strong className="num" data-testid="usd-balance">{formatUsd(b.usd.balanceCents)}</strong></div>
       <div><span>Kept for living costs</span><strong className="num" data-testid="usd-reserve">{formatUsd(b.usd.reserveCents)}</strong></div>
       <div><span>Available to pay</span><strong className="num" data-testid="usd-available">{formatUsd(b.usd.availableCents)}</strong></div>
     </section>
@@ -189,15 +208,21 @@ function Budget({ st }: { st: StateResponse | null }) {
 }
 
 function Login({ config, onDone }: { config: Config | null; onDone: (csrf: string) => void | Promise<void> }) {
-  const [email, setEmail] = useState("alice@demo.local");
+  const live = config?.appMode === "live";
+  const [mode, setMode] = useState<"signin" | "register">("signin");
+  const [email, setEmail] = useState(live ? "" : "alice@demo.local");
+  const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const registering = live && mode === "register";
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true); setErr(null);
     try {
-      const r = await api<{ csrfToken: string }>("POST", "/api/auth/login", { email, password });
+      const r = registering
+        ? await api<{ csrfToken: string }>("POST", "/api/auth/register", { email, displayName: name, password })
+        : await api<{ csrfToken: string }>("POST", "/api/auth/login", { email, password });
       await onDone(r.csrfToken);
     } catch (x) { setErr(x instanceof ApiFailure ? x.message : "Sign-in failed."); } finally { setBusy(false); }
   }
@@ -205,14 +230,24 @@ function Login({ config, onDone }: { config: Config | null; onDone: (csrf: strin
     <main className="shell narrow">
       <h1>TuitionBridge</h1>
       <ModeBadges config={config} />
-      <Card title="Sign in (local demo)">
+      {config?.appMode === "sandbox" && <div className="sandbox-banner" role="note"><strong>SANDBOX · TEST DATA.</strong> Fictional users and providers; payments are simulated.</div>}
+      <SetupBanner config={config} />
+      <Card title={registering ? "Create your account" : live ? "Sign in" : "Sign in (sandbox test users)"}>
         <form className="form" onSubmit={submit}>
           <label className="field"><span>Email</span><input value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" data-testid="email" /></label>
-          <label className="field"><span>Password</span><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" data-testid="password" /></label>
+          {registering && <label className="field"><span>Your name</span><input value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" data-testid="display-name" /></label>}
+          <label className="field"><span>Password{registering ? " (at least 10 characters)" : ""}</span><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={registering ? "new-password" : "current-password"} data-testid="password" /></label>
           {err && <p className="alert" role="alert">{err}</p>}
-          <button className="btn btn-primary" disabled={busy} data-testid="login-btn">Sign in</button>
+          <button className="btn btn-primary" disabled={busy} data-testid="login-btn">{registering ? "Create account" : "Sign in"}</button>
         </form>
-        <p className="hint">Demo accounts are documented in the README. Everything here is synthetic and payments are simulated.</p>
+        {live && (
+          <p className="hint">
+            {registering ? "Already registered? " : "New here? "}
+            <button className="link" type="button" onClick={() => { setMode(registering ? "signin" : "register"); setErr(null); }} data-testid="toggle-register">{registering ? "Sign in" : "Create an account"}</button>
+            . Your data stays in a local database on this computer.
+          </p>
+        )}
+        {!live && <p className="hint">Sandbox test accounts are documented in the README. Everything here is fictional and payments are simulated.</p>}
       </Card>
     </main>
   );
