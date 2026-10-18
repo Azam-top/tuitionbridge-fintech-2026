@@ -5,6 +5,8 @@ export interface AppConfig {
   port: number;
   dbPath: string;
   demoMode: boolean;
+  taskRateLimitPerMinute: number;
+  mutateRateLimitPerMinute: number;
   llmApiKey: string | null;
   llmModel: string | null;
   /** Optional provider endpoint override; used to point the adapter at a local fake provider in tests. */
@@ -46,6 +48,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     quoteTtlMs: num(env.APP_QUOTE_TTL_MS, 15 * 60_000),
     cookieSecure: env.APP_COOKIE_SECURE === "1",
     loginRateLimitPerMinute: num(env.APP_LOGIN_RATE_LIMIT, 10),
+    taskRateLimitPerMinute: num(env.APP_TASK_RATE_LIMIT, 12),
+    mutateRateLimitPerMinute: num(env.APP_MUTATE_RATE_LIMIT, 120),
   };
 }
 

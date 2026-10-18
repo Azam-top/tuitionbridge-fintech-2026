@@ -44,8 +44,8 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   const app = Fastify({ logger: false, bodyLimit: 64 * 1024, trustProxy: false });
   app.register(fastifyCookie);
   const loginLimiter = new RateLimiter(ctx.config.loginRateLimitPerMinute, 60_000);
-  const mutateLimiter = new RateLimiter(120, 60_000);
-  const taskLimiter = new RateLimiter(12, 60_000);
+  const mutateLimiter = new RateLimiter(ctx.config.mutateRateLimitPerMinute, 60_000);
+  const taskLimiter = new RateLimiter(ctx.config.taskRateLimitPerMinute, 60_000);
 
   app.addHook("onSend", async (_req, reply, payload) => {
     reply.header("X-Content-Type-Options", "nosniff");
