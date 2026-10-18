@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { api, ApiFailure, type Config, type Instruction, type Invoice, type Offer, type Recipient, type Reference, type Balances } from "./api";
 import { Card, Chip, Row } from "./components";
 import { fmtTime, formatKzt, formatUsd, kztToTiyn, tiynToInput } from "./format";
+import { Icon } from "./icons";
 
 const fail = (e: unknown, fallback: string) => (e instanceof ApiFailure ? e.message : fallback);
 
@@ -136,10 +137,10 @@ export function OffersCard({ invoice, offers, reference, config, onChanged, onEr
   const local = (d: Date) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
   const [f, setF] = useState({ providerName: "", rate: "", feeUsd: "", arrivalAt: "", validUntil: local(new Date(now.getTime() + 30 * 60000)), observedAt: local(now), sourceNote: "" });
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
+  const [msg, setMsg] = useState<{ status: string; text: string } | null>(null);
   async function fetchWise() {
     setBusy(true); setMsg(null);
-    try { const r = await api<{ result: { message: string } }>("POST", `/api/invoices/${invoice.id}/offers/refresh`); setMsg(r.result.message); onChanged(); }
+    try { const r = await api<{ result: { status: string; message: string } }>("POST", `/api/invoices/${invoice.id}/offers/refresh`); setMsg({ status: r.result.status, text: r.result.message }); onChanged(); }
     catch (x) { onError(fail(x, "Could not fetch quotes.")); } finally { setBusy(false); }
   }
   async function add(e: React.FormEvent) {
@@ -156,9 +157,13 @@ export function OffersCard({ invoice, offers, reference, config, onChanged, onEr
         <ReferenceLine reference={reference} />
         <div className="actions">
           {config.wiseQuotes
-            ? <button className="btn" onClick={fetchWise} disabled={busy} data-testid="fetch-wise">Get live Wise quotes</button>
+            ? <button className="btn" onClick={fetchWise} disabled={busy} data-testid="fetch-wise"><Icon name={busy ? "clock" : "globe"} size={16} /> {busy ? "Asking Wise…" : "Get live Wise quotes"}</button>
             : <span className="muted small">Live Wise quotes are switched off (set APP_WISE_QUOTES=1). You can still enter offers you were given.</span>}
-          {msg && <span role="status" className="muted small" data-testid="offers-message">{msg}</span>}
+          {msg && (
+            <span role="status" className={msg.status === "OK" ? "small ok-text" : "small warn-text"} data-testid="offers-message">
+              <Icon name={msg.status === "OK" ? "check" : "alert"} size={14} /> {msg.text}{msg.status !== "OK" ? " Source problem: nothing was invented." : ""}
+            </span>
+          )}
         </div>
         {offers.length === 0 ? <p className="muted" data-testid="no-offers">No offers yet. Fetch a live quote or enter an offer from your bank or provider. The app never invents one.</p> : (
           <ul className="plain" data-testid="offer-list">
@@ -167,7 +172,7 @@ export function OffersCard({ invoice, offers, reference, config, onChanged, onEr
                 <strong>{o.providerName}</strong> <Chip tone={o.provenance === "PROVIDER_LIVE" ? "info" : "warn"}>{PROVENANCE_LABEL[o.provenance] ?? o.provenance}</Chip> {o.expired && <Chip tone="bad">expired</Chip>}
                 <br /><span className="num">{o.rate} KZT per USD</span> · fee <span className="num">{formatUsd(o.feeCents)}</span> · arrives about {fmtTime(o.estArrivalAt)} · valid until {fmtTime(o.expiresAt)}
                 {o.deviationBps !== null && <span className="muted small"> · {bpsText(o.deviationBps)}</span>}
-                <br /><span className="muted small">{o.sourceNote ?? ""}{o.observedAt ? ` (seen ${fmtTime(o.observedAt)})` : ""}</span>
+                <br /><span className="muted small">{o.sourceNote ?? "source note unknown"}{o.observedAt ? ` (seen ${fmtTime(o.observedAt)})` : " (observation time unknown)"}</span>
               </li>
             ))}
           </ul>

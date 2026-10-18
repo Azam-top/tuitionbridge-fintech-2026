@@ -238,6 +238,23 @@ const driver = (preference: "cheapest" | "fastest" = "cheapest") => new Scripted
   return turn(`Done after ${n} requests.`);
 });
 
+describe("live agent with no offers (server side)", () => {
+  it("get_quotes reports NO_OFFERS, no proposal is created and nothing is invented", async () => {
+    const ctx = makeLiveCtx();
+    const u = readyUser(ctx);
+    ctx.stub.wiseFail = true; // no provider quote either
+    const runner = createRunner(ctx, driver(), { retryDelayMs: 1 });
+    const t = runner.startTask(u.userId, "execute", u.invoice.id, EN);
+    await runner.settled(t.id);
+    const task = getTask(ctx, u.userId, t.id);
+    expect(task.state).toBe("BLOCKED");
+    expect(task.proposal_id).toBeNull();
+    expect(count(ctx, "quotes")).toBe(0);
+    const out = ctx.db.prepare("SELECT output_json FROM agent_events WHERE task_id=? AND tool='get_quotes'").get(t.id) as { output_json: string };
+    expect(JSON.parse(out.output_json).error.code).toBe("NO_OFFERS");
+  });
+});
+
 describe("live agent flow: sources, approval, instruction (the app moves no money)", () => {
   async function planned(preference: "cheapest" | "fastest" = "cheapest") {
     const ctx = makeLiveCtx();

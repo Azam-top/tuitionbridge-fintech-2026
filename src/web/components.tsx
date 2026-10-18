@@ -34,9 +34,9 @@ export function ModeBadges({ config }: { config: Config | null }) {
   );
 }
 
-export function Card({ title, children, aside, id }: { title: string; children: ReactNode; aside?: ReactNode; id?: string }) {
+export function Card({ title, children, aside, id, className = "" }: { title: string; children: ReactNode; aside?: ReactNode; id?: string; className?: string }) {
   return (
-    <section className="card" aria-labelledby={id ? `${id}-h` : undefined} id={id}>
+    <section className={`card ${className}`.trim()} aria-labelledby={id ? `${id}-h` : undefined} id={id}>
       <header className="card-head">
         <h2 id={id ? `${id}-h` : undefined}>{title}</h2>
         {aside}
@@ -55,7 +55,7 @@ export function Row({ label, children, strong, testId }: { label: string; childr
   );
 }
 
-export function Chip({ tone, children }: { tone: "ok" | "warn" | "bad" | "info" | "muted"; children: ReactNode }) {
+export function Chip({ tone, children }: { tone: "ok" | "warn" | "bad" | "info" | "muted" | "accent"; children: ReactNode }) {
   return <span className={`chip chip-${tone}`}>{children}</span>;
 }
 

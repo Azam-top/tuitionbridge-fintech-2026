@@ -134,13 +134,13 @@ test.describe("TuitionBridge LIVE mode (fake local model provider; Wise and NBK 
     await expect(page.getByTestId("offers-card")).toHaveCount(0);
   });
 
-  test("with no offers the agent finds nothing and nothing is invented", async ({ page }) => {
+  test("with no offers the planner says so, cannot start, and nothing is invented", async ({ page }) => {
     await register(page);
     await setup(page);
     await invoice(page);
     await expect(page.getByTestId("no-offers")).toContainText("never invents");
-    await page.getByTestId("start-task").click();
-    await expect(page.getByTestId("task-state")).toContainText("Blocked", { timeout: 20_000 });
+    await expect(page.getByTestId("planner-no-offers")).toContainText("no payment options yet");
+    await expect(page.getByTestId("start-task")).toBeDisabled();
     await expect(page.getByTestId("approval-card")).toHaveCount(0);
   });
 });

@@ -88,6 +88,6 @@ export interface TaskView {
   events: TaskEvent[]; proposal: Proposal | null; receipt: Receipt | null; instruction: Instruction | null;
 }
 export interface RouteRow {
-  quoteId: string; provider: string; feasible: boolean; rate?: string; totalDebit: string; fee: string; recipientWillReceive: string; roundingSurplus: string;
+  quoteId: string; provider: string; feasible: boolean; rate?: string; totalDebit: string; totalDebitCents?: string; fee: string; recipientWillReceive: string; roundingSurplus: string;
   usdAfterPayment: string; estArrivalAt: string; expiresAt: string; source?: string | null; sourceNote?: string | null; exclusions: { code: string; message: string }[];
 }

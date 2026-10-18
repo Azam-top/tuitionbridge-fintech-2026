@@ -1,71 +1,43 @@
 import { useEffect, useRef, useState } from "react";
 import { explain } from "./friendly";
-import { api, ApiFailure, type Proposal, type Receipt, type RouteRow, type TaskView } from "./api";
+import { api, ApiFailure, type Balances, type Proposal, type Receipt, type RouteRow, type TaskView } from "./api";
 import { Card, Chip, Details, Row } from "./components";
+import { Icon } from "./icons";
+import { ProtectedBudget, RoutePicker } from "./Routes";
 import { InstructionCard, PROVENANCE_LABEL } from "./LivePanels";
 import { fmtRelative, fmtTime, formatKzt, formatUsd } from "./format";
 
-const STATE_TEXT: Record<string, { tone: "ok" | "warn" | "bad" | "info" | "muted"; text: string }> = {
-  RUNNING: { tone: "info", text: "Agent is working" },
-  AWAITING_APPROVAL: { tone: "warn", text: "Waiting for your approval" },
-  EXECUTING: { tone: "info", text: "Executing after your approval" },
-  APPROVED: { tone: "ok", text: "Approved: instruction issued" },
-  COMPLETED: { tone: "ok", text: "Completed (simulated)" },
-  BLOCKED: { tone: "bad", text: "Blocked: nothing was paid" },
-  FAILED: { tone: "bad", text: "Failed: nothing was paid unless a receipt is shown" },
-  CANCELLED: { tone: "muted", text: "Cancelled" },
-};
-
-export function TaskPanel({ view, live, now, approvalMinutes, limits, onChanged, onError }: { view: TaskView; live: boolean; now: string; approvalMinutes: number; limits: { maxToolCalls: number; maxModelRequests: number }; onChanged: () => void; onError: (m: string) => void }) {
+/** Everything that follows the plan in the main column: routes, budget, review card, instruction/receipt, technical details. */
+export function TaskPanel({ view, live, now, nowMs, approvalMinutes, limits, routes, best, selectedId, onSelect, balances, onChanged, onError }: {
+  view: TaskView; live: boolean; now: string; nowMs: number; approvalMinutes: number; limits: { maxToolCalls: number; maxModelRequests: number };
+  routes: RouteRow[]; best: string | null; selectedId: string | null; onSelect: (id: string) => void; balances: Balances | null; onChanged: () => void; onError: (m: string) => void;
+}) {
   const { task, events, proposal, receipt, instruction } = view;
-  const st = STATE_TEXT[task.state] ?? { tone: "muted" as const, text: task.state };
-  const evalEvent = [...events].reverse().find((e) => e.tool === "evaluate_routes" && e.ok);
-  const routes = (evalEvent?.output?.routes as RouteRow[] | undefined) ?? null;
-  const best = (evalEvent?.output?.bestQuoteId as string | null | undefined) ?? null;
-
+  const selected = routes.find((r) => r.quoteId === selectedId) ?? routes.find((r) => r.quoteId === best) ?? null;
+  const reserveCents = proposal?.payload.reserveCents ?? task.intent.reserveCents;
   return (
     <div className="stack" data-testid="task-panel" data-task-state={task.state}>
-      <p className="sr-only" role="status" aria-live="polite">{st.text}</p>
-      <Card
-        id="task"
-        title="Payment plan"
-        aside={<Chip tone={st.tone}><span data-testid="task-state">{st.text}</span></Chip>}
-      >
-        {task.summary && <p className="agent-says" data-testid="agent-summary"><strong>Summary:</strong> {task.summary}</p>}
-        {task.error && task.state !== "CANCELLED" && <p className="alert" role="alert" data-testid="task-error">{task.error}</p>}
-        <Intent task={task} />
-      </Card>
-
       {receipt && <ReceiptCard receipt={receipt} />}
       {instruction && <InstructionCard instruction={instruction} onChanged={onChanged} onError={onError} />}
-      {routes && <Routes routes={routes} best={best} proposal={proposal} now={now} live={live} />}
-      {task.state === "AWAITING_APPROVAL" && proposal && <ApprovalCard taskId={task.id} proposal={proposal} live={live} now={now} approvalMinutes={approvalMinutes} onChanged={onChanged} onError={onError} />}
-      {task.state === "EXECUTING" && <p role="status" className="muted">Recording your approved payment in the sandbox ledger…</p>}
+      {routes.length > 0 && <RoutePicker routes={routes} best={best} proposal={proposal} nowMs={nowMs} now={now} live={live} selectedId={selectedId} onSelect={onSelect} />}
+      {routes.length > 0 && balances && (
+        <ProtectedBudget
+          balanceCents={proposal?.display.usdBalanceBeforeCents ?? balances.usd.balanceCents}
+          totalCents={selected?.totalDebitCents ?? proposal?.payload.totalDebitCents ?? "0"}
+          reserveCents={reserveCents}
+        />
+      )}
+      {task.state === "AWAITING_APPROVAL" && proposal && <ApprovalCard taskId={task.id} proposal={proposal} live={live} now={now} nowMs={nowMs} approvalMinutes={approvalMinutes} onChanged={onChanged} onError={onError} />}
 
       <details className="card tech" data-testid="tech-panel">
         <summary>Technical details: tool trace, usage and fingerprints</summary>
         <p className="muted small">
-          Agent mode: <strong>{task.mode}</strong>{task.model ? ` (${task.model})` : ""}; payments: <strong>SIMULATED</strong>.
+          Agent mode: <strong>{task.mode}</strong>{task.model ? ` (${task.model})` : ""}; payments: <strong>{live ? "NOT MOVED BY APP" : "SIMULATED"}</strong>.
           {task.mode === "MOCK" && " This run used the deterministic stand-in, not a live model."}
         </p>
         <Usage task={task} limits={limits} />
         <Timeline events={events} />
       </details>
-    </div>
-  );
-}
-
-function Intent({ task }: { task: TaskView["task"] }) {
-  const i = task.intent;
-  return (
-    <div className="intent" data-testid="intent">
-      <h3>What the agent understood from you</h3>
-      <ul>
-        <li>Route preference: <strong>{i.preference ?? "not stated (the agent may choose; defaults to cheapest feasible)"}</strong>{i.preferenceSource ? ` (${i.preferenceSource})` : ""}</li>
-        <li>Keep for living costs: <strong>{formatUsd(i.reserveCents)}</strong> ({i.reserveSource === "instruction" ? "from your instruction" : "your account default"}). The agent cannot lower this.</li>
-        <li>Deadline, amount and beneficiary: taken from the invoice you confirmed. The agent cannot change them.</li>
-        <li className="muted">Your words: “{task.instruction}”</li>
-      </ul>
     </div>
   );
 }
@@ -80,45 +52,9 @@ function Usage({ task, limits }: { task: TaskView["task"]; limits: { maxToolCall
   );
 }
 
-function Routes({ routes, best, proposal, now, live }: { routes: RouteRow[]; best: string | null; proposal: Proposal | null; now: string; live: boolean }) {
-  return (
-    <Card id="routes" title="Compare routes" aside={<span className="muted small">{live ? "Arrival times are estimates" : "Simulated quotes; arrival times are estimates"}</span>}>
-      <div className="routes" data-testid="routes-table">
-        {routes.map((r) => {
-          const kind = r.feasible ? (r.quoteId === best ? "best" : "ok") : "excluded";
-          return (
-            <article key={r.quoteId} className={`route route-${kind}`} data-testid={`route-${kind}`}>
-              <header>
-                <h3>{r.provider.replace(" (simulated)", "")}</h3>
-                {r.feasible ? (r.quoteId === best ? <Chip tone="ok">Selected</Chip> : <Chip tone="info">Qualifies</Chip>) : <Chip tone="bad">Excluded</Chip>}
-              </header>
-              <p className="route-total"><span>You pay in total</span><strong className="num">{r.totalDebit}</strong></p>
-              <dl className="kv">
-                <div><dt>University receives</dt><dd className="num">{r.recipientWillReceive}{r.roundingSurplus !== "KZT 0.00" && <small className="muted"> (incl. {r.roundingSurplus} rounding surplus)</small>}</dd></div>
-                <div><dt>Fee</dt><dd className="num">{r.fee}</dd></div>
-                {r.rate && <div><dt>Rate</dt><dd className="num">{r.rate} KZT per USD</dd></div>}
-                <div><dt>USD left after paying</dt><dd className="num">{r.usdAfterPayment}</dd></div>
-                <div><dt>Estimated arrival</dt><dd title={r.estArrivalAt}>{fmtTime(r.estArrivalAt)} <small className="muted">({fmtRelative(r.estArrivalAt, now)})</small></dd></div>
-                <div><dt>Quote valid until</dt><dd>{fmtTime(r.expiresAt)}</dd></div>
-                {r.source && <div><dt>Source</dt><dd>{PROVENANCE_LABEL[r.source] ?? r.source}</dd></div>}
-              </dl>
-              {!r.feasible && (
-                <ul className="reasons" aria-label="Why this route is excluded">
-                  {r.exclusions.map((e, k) => <li key={k}><Chip tone="bad">{e.code.replace(/_/g, " ")}</Chip> {e.message}</li>)}
-                </ul>
-              )}
-            </article>
-          );
-        })}
-      </div>
-      {!best && <p className="alert" role="alert" data-testid="no-route">No route qualifies, so no payment was proposed.</p>}
-      {proposal && <p className="muted small">Each option is a fixed USD fee at its own rate; no other FX margin is added by this app.</p>}
-    </Card>
-  );
-}
-
-function ApprovalCard({ taskId, proposal, live, now, approvalMinutes, onChanged, onError }: { taskId: string; proposal: Proposal; live: boolean; now: string; approvalMinutes: number; onChanged: () => void; onError: (m: string) => void }) {
+function ApprovalCard({ taskId, proposal, live, now, nowMs, approvalMinutes, onChanged, onError }: { taskId: string; proposal: Proposal; live: boolean; now: string; nowMs: number; approvalMinutes: number; onChanged: () => void; onError: (m: string) => void }) {
   const p = proposal.payload;
+  const expired = Date.parse(p.quoteExpiresAt) <= nowMs;
   const clicked = useRef(false); // synchronous double-click guard; the server remains authoritative
   const [busy, setBusy] = useState(false);
   const heading = useRef<HTMLDivElement>(null);
@@ -144,7 +80,7 @@ function ApprovalCard({ taskId, proposal, live, now, approvalMinutes, onChanged,
   }
 
   return (
-    <Card id="approval" title="Review and approve this exact payment" aside={<Chip tone="warn">Nothing has been paid yet</Chip>}>
+    <Card id="approval" title="Review and approve this exact payment" aside={<Chip tone="warn">Nothing has been paid yet</Chip>} className="enter">
       <div ref={heading} tabIndex={-1} className="focus-target" aria-label="Approval required: review the transaction below" />
       <div className="approval-grid" data-testid="approval-card">
         <section className="sect" aria-labelledby="ap-rec">
@@ -181,9 +117,10 @@ function ApprovalCard({ taskId, proposal, live, now, approvalMinutes, onChanged,
           </dl>
         </section>
       </div>
+      {expired && <p className="alert" role="alert"><Icon name="clock" size={18} /> The quote has expired, so it cannot be approved. Re-plan for fresh numbers.</p>}
       <p className="hint">Approving binds exactly the figures above. If anything changes, a new proposal and a new approval are required. Only you can approve; the agent cannot.</p>
       <div className="actions">
-        <button className="btn btn-primary btn-lg" onClick={approve} disabled={busy} data-testid="approve-btn">{live ? "Approve and issue payment instruction" : "Approve and pay (simulated)"}</button>
+        <button className="btn btn-primary btn-lg" onClick={approve} disabled={busy || expired} data-testid="approve-btn">{live ? "Approve and issue payment instruction" : "Approve and pay (simulated)"}</button>
         <button className="btn btn-lg" onClick={reject} disabled={busy} data-testid="reject-btn">Reject</button>
       </div>
       <details className="inline-details">

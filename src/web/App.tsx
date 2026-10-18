@@ -7,14 +7,12 @@ import { ImportCard } from "./ImportCard";
 import { GuidedDemo, type Scenario } from "./GuidedDemo";
 import { Journey } from "./Journey";
 import { FundsEditor, NewInvoiceCard, OffersCard, RecipientsCard, SetupBanner } from "./LivePanels";
+import { EXAMPLES, PlannerPanel, ReviewBar } from "./Planner";
+import { buildInstruction, prefersReducedMotion, routesOf, useServerClock, type Preference } from "./plan";
+import { Icon, Logo } from "./icons";
 import { explain } from "./friendly";
 import { formatUsd } from "./format";
 
-const EXAMPLES = [
-  "Pay this invoice by its deadline, use the cheapest feasible route, and keep USD 300 for living costs.",
-  "Pay this invoice by its deadline, prefer faster arrival, and keep USD 300 for living costs.",
-  "Оплати счёт до срока, выбери самый дешёвый вариант и оставь 300 долларов на жизнь.",
-];
 const ACTIVE = new Set(["RUNNING", "AWAITING_APPROVAL", "EXECUTING"]);
 
 export function App() {
@@ -26,8 +24,10 @@ export function App() {
   const [instruction, setInstruction] = useState(EXAMPLES[0]);
   const [starting, setStarting] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [routeSel, setRouteSel] = useState<string | null>(null);
   const [scenarioKey, setScenarioKey] = useState<string | null>(null);
   const taskId = useRef<string | null>(null);
+  const nowMs = useServerClock(st?.now);
 
   const loadTask = useCallback(async (id: string) => {
     const v = await api<TaskView>("GET", `/api/tasks/${id}`);
@@ -59,28 +59,54 @@ export function App() {
     })();
   }, [refresh]);
 
-  // Poll only while the agent is running.
+  // Poll while the agent works; while a proposal waits, refresh now and then so an expired quote is noticed.
   const active = task && (task.task.state === "RUNNING" || task.task.state === "EXECUTING");
   useEffect(() => {
     if (!active) return;
     const t = setInterval(() => { void refresh(); }, 600);
     return () => clearInterval(t);
   }, [active, refresh]);
+  const waiting = task?.task.state === "AWAITING_APPROVAL";
+  useEffect(() => {
+    if (!waiting) return;
+    const t = setInterval(() => { void refresh(); }, 30_000);
+    return () => clearInterval(t);
+  }, [waiting, refresh]);
 
   const onError = (m: string) => setError(m);
   const taskIsActive = !!task && ACTIVE.has(task.task.state);
   const invoices = st?.invoices ?? [];
   const invoice = invoices.find((i) => i.id === selectedId) ?? invoices.find((i) => i.status !== "PAID") ?? invoices[0] ?? null;
+  const ri = routesOf(task);
+  const bestId = ri?.best ?? null;
+  // The inspected route follows the server's recommendation until the user picks another one.
+  useEffect(() => { setRouteSel(bestId); }, [bestId, task?.task.id]);
 
-  async function start() {
+  async function startWith(text: string) {
     if (!invoice) return;
     setError(null); setStarting(true);
     try {
-      const v = await api<TaskView>("POST", "/api/tasks", { invoiceId: invoice.id, instruction });
+      const v = await api<TaskView>("POST", "/api/tasks", { invoiceId: invoice.id, instruction: text });
       taskId.current = v.task.id;
       setTask(v);
       await refresh();
     } catch (e) { setError(explain(e, "Could not start the task.")); } finally { setStarting(false); }
+  }
+  const start = () => startWith(instruction);
+
+  /** Re-plan through the existing endpoints: cancel the waiting proposal, then ask again with the new preference and reserve. */
+  async function replan(pref: Preference, reserveCents: string) {
+    if (!invoice) return;
+    setError(null); setStarting(true);
+    try {
+      if (task && task.task.state === "AWAITING_APPROVAL") await api("POST", `/api/tasks/${task.task.id}/cancel`);
+      const text = buildInstruction(pref, reserveCents);
+      setInstruction(text);
+      const v = await api<TaskView>("POST", "/api/tasks", { invoiceId: invoice.id, instruction: text });
+      taskId.current = v.task.id;
+      setTask(v);
+      await refresh();
+    } catch (e) { setError(explain(e, "Could not re-plan.")); await refresh(); } finally { setStarting(false); }
   }
 
   async function logout() {
@@ -88,36 +114,69 @@ export function App() {
     taskId.current = null; setTask(null); setSt(null); setAuthed(false); setCsrf("");
   }
 
+  function reviewPayment() {
+    const card = document.getElementById("approval");
+    if (!card) return;
+    card.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "start" });
+    (card.querySelector("[tabindex='-1']") as HTMLElement | null)?.focus({ preventScroll: true });
+  }
+
   const live = config?.appMode === "live";
   const recipients = st?.recipients ?? [];
   const offers = (invoice && st?.offers[invoice.id]) || [];
   const setupDone = !!st && st.balances.usd.balanceCents !== "0" && recipients.length > 0;
-  // The decision and the result lead the page; earlier or failed attempts sit after the invoice and plan cards.
-  const taskLeads = !!task && (task.task.state === "AWAITING_APPROVAL" || task.task.state === "EXECUTING" || task.task.state === "COMPLETED");
+  // The decision and the result lead the page; earlier or failed attempts sit after the invoice cards.
+  const taskLeads = !!task && (task.task.state === "AWAITING_APPROVAL" || task.task.state === "EXECUTING" || task.task.state === "COMPLETED" || task.task.state === "APPROVED");
+  const planner = (
+    <PlannerPanel
+      config={config} live={live} invoice={invoice} view={task} offerCount={offers.filter((o) => !o.expired).length} nowMs={nowMs}
+      instruction={instruction} setInstruction={setInstruction} starting={starting} taskIsActive={taskIsActive}
+      routes={ri?.routes ?? []} best={bestId} selectedId={routeSel} balances={st?.balances ?? null} onStart={start} onReplan={replan}
+    />
+  );
   const taskPanel = task && st ? (
-    <TaskPanel view={task} live={live} now={st.now} approvalMinutes={config?.limits.approvalMinutes ?? 5} limits={config?.limits ?? { maxToolCalls: 8, maxModelRequests: 10 }} onChanged={() => { void refresh(); }} onError={onError} />
+    <TaskPanel
+      view={task} live={live} now={st.now} nowMs={nowMs} approvalMinutes={config?.limits.approvalMinutes ?? 5}
+      limits={config?.limits ?? { maxToolCalls: 8, maxModelRequests: 10 }} routes={ri?.routes ?? []} best={bestId} selectedId={routeSel} onSelect={setRouteSel}
+      balances={st.balances} onChanged={() => { void refresh(); }} onError={onError}
+    />
   ) : null;
 
-  if (authed === null) return <main className="shell"><p role="status">Loading…</p></main>;
+  if (authed === null) return <main className="shell"><p role="status" className="loading-line"><span className="pulse" aria-hidden="true" /> Loading…</p></main>;
   if (!authed) return <Login config={config} onDone={async (csrf) => { setCsrf(csrf); setError(null); await refresh(); }} />;
+
+  const invoiceCards = (
+    <>
+      {invoices.length > 1 && (
+        <label className="field">
+          <span>Invoice</span>
+          <select value={invoice?.id ?? ""} onChange={(e) => setSelectedId(e.target.value)} data-testid="invoice-select">
+            {invoices.map((i) => <option key={i.id} value={i.id}>{i.reference} ({i.status.toLowerCase()})</option>)}
+          </select>
+        </label>
+      )}
+      {invoice ? (
+        <InvoiceCard invoice={invoice} locked={taskIsActive} live={live} onChanged={() => { void refresh(); }} onError={onError} />
+      ) : <Card title="Invoice"><p className="muted">No invoice yet.</p></Card>}
+      {live && !invoices.length && <NewInvoiceCard recipients={recipients} onCreated={(inv) => { setSelectedId(inv.id); setError(null); void refresh(); }} onError={onError} />}
+      {live && invoice?.status === "CONFIRMED" && config && <OffersCard invoice={invoice} offers={offers} reference={st?.reference ?? null} config={config} onChanged={() => { setError(null); void refresh(); }} onError={onError} />}
+    </>
+  );
 
   return (
     <div className="shell">
       <a className="skip" href="#invoice">Skip to the invoice</a>
       <header className="top">
-        <div>
-          <h1>TuitionBridge</h1>
-          <p className="muted small">Pay your tuition on time without spending your living money. You approve every payment.</p>
-        </div>
+        <div className="brand"><Logo size={30} /><span className="wordmark">TuitionBridge</span></div>
         <div className="top-right">
           <ModeBadges config={config} />
-          <span className="muted small">{st?.user.displayName} · <button className="link" onClick={logout}>Sign out</button></span>
+          <span className="user"><span className="avatar" aria-hidden="true">{(st?.user.displayName ?? "?").slice(0, 1).toUpperCase()}</span><span className="muted small">{st?.user.displayName}</span> <button className="link" onClick={logout}>Sign out</button></span>
         </div>
       </header>
 
       {config?.appMode === "sandbox" && (
         <div className="sandbox-banner" role="note" data-testid="sandbox-banner">
-          <strong>SANDBOX · TEST DATA.</strong> Fictional university, providers and users, with payments in a simulated ledger. This is the separate competition check, not the real application mode.
+          <Icon name="info" size={18} /> <span><strong>SANDBOX · TEST DATA.</strong> Fictional university, providers and users, with payments in a simulated ledger. This is the separate competition check, not the real application mode.</span>
         </div>
       )}
       <SetupBanner config={config} />
@@ -125,69 +184,41 @@ export function App() {
       <div aria-live="polite" className="toast-area">
         {error && (
           <div className="alert" role="alert" data-testid="error-banner">
-            {error} <button className="link" onClick={() => setError(null)}>Dismiss</button>
+            <Icon name="alert" size={18} /> <span>{error}</span> <button className="link" onClick={() => setError(null)}>Dismiss</button>
           </div>
         )}
       </div>
 
-      <main className={live ? "grid single" : "grid"}>
-        {config?.demoMode && (
-          <aside className="stack">
-            <GuidedDemo
-              config={config} current={scenarioKey}
-              onLoaded={async (sc) => {
-                taskId.current = null; setTask(null); setError(null); setSelectedId(null); setScenarioKey(sc.key);
-                if ("instruction" in sc && sc.instruction) setInstruction(sc.instruction);
-                await refresh();
-              }}
-              onError={onError}
-            />
-          </aside>
-        )}
-        <div className="stack">
-          <Journey invoice={invoice} task={task} ctx={{ config, setupDone, offerCount: offers.filter((o) => !o.expired).length }} />
-          <Budget st={st} live={live} />
-          {live && st && <FundsEditor key={st.balances.usd.balanceCents + st.balances.usd.reserveCents} balances={st.balances} locked={taskIsActive} onSaved={() => { setError(null); void refresh(); }} onError={onError} />}
-          {live && <RecipientsCard recipients={recipients} onChanged={() => { setError(null); void refresh(); }} onError={onError} />}
-          {taskLeads && taskPanel}
-          {invoices.length > 1 && (
-            <label className="field">
-              <span>Invoice</span>
-              <select value={invoice?.id ?? ""} onChange={(e) => setSelectedId(e.target.value)} data-testid="invoice-select">
-                {invoices.map((i) => <option key={i.id} value={i.id}>{i.reference} ({i.status.toLowerCase()})</option>)}
-              </select>
-            </label>
-          )}
-          {invoice ? (
-            <InvoiceCard invoice={invoice} locked={taskIsActive} live={live} onChanged={() => { void refresh(); }} onError={onError} />
-          ) : <Card title="Invoice"><p>No invoice yet.</p></Card>}
+      <Journey invoice={invoice} task={task} ctx={{ config, setupDone, offerCount: offers.filter((o) => !o.expired).length }} />
 
-          {live && !invoices.length && <NewInvoiceCard recipients={recipients} onCreated={(inv) => { setSelectedId(inv.id); setError(null); void refresh(); }} onError={onError} />}
-          {live && invoice?.status === "CONFIRMED" && config && <OffersCard invoice={invoice} offers={offers} reference={st?.reference ?? null} config={config} onChanged={() => { setError(null); void refresh(); }} onError={onError} />}
+      <section className="hero">
+        <h1>Your tuition. A clear way forward.</h1>
+        <p className="muted">Compare transfer options without touching your living budget.</p>
+      </section>
 
-          <Card id="instruction" title="Plan the payment">
-            <label className="field">
-              <span>What should the agent do? (English; a Russian example is included)</span>
-              <textarea value={instruction} onChange={(e) => setInstruction(e.target.value)} rows={3} maxLength={500} data-testid="instruction" disabled={taskIsActive} />
-            </label>
-            <div className="chips">
-              {EXAMPLES.map((ex, i) => (<button key={i} className="chip-btn" onClick={() => setInstruction(ex)} disabled={taskIsActive}>Example {i + 1}</button>))}
-            </div>
-            <div className="actions">
-              <button className="btn btn-primary" onClick={start} disabled={starting || taskIsActive || invoice?.status !== "CONFIRMED" || config?.agentStatus === "NOT_CONFIGURED"} data-testid="start-task">Plan my payment</button>
-              {invoice?.status !== "CONFIRMED" && invoice?.status !== "PAID" && invoice?.status !== "INSTRUCTED" && <span className="muted small">Confirm the invoice first.</span>}
-              {(invoice?.status === "PAID" || invoice?.status === "INSTRUCTED") && <span className="muted small">{invoice.status === "PAID" ? "This invoice is already paid." : "A payment instruction was already issued for this invoice."}</span>}
-              {config?.agentStatus === "NOT_CONFIGURED" && <span className="muted small">Planning is disabled until a model is configured.</span>}
-            </div>
-            <p className="hint">The agent can read, compare and prepare. It cannot approve or lower your reserve; {live ? "after you approve, the app issues a payment instruction and moves no money." : "money moves only after you approve."}</p>
-          </Card>
+      {config?.demoMode && (
+        <GuidedDemo
+          config={config} current={scenarioKey}
+          onLoaded={async (sc: Scenario | { server: string; instruction?: string; key: string }) => {
+            taskId.current = null; setTask(null); setError(null); setSelectedId(null); setScenarioKey(sc.key);
+            if ("instruction" in sc && sc.instruction) setInstruction(sc.instruction);
+            await refresh();
+          }}
+          onError={onError}
+        />
+      )}
 
-          {!taskLeads && taskPanel}
-
-          {live && invoices.length > 0 && <NewInvoiceCard recipients={recipients} defaultOpen={false} onCreated={(inv) => { setSelectedId(inv.id); setError(null); void refresh(); }} onError={onError} />}
-          <ImportCard disabled={taskIsActive} onImported={(inv) => { setSelectedId(inv.id); setError(null); void refresh(); }} onError={onError} />
-        </div>
+      <main className="workspace">
+        <Budget st={st} live={live} />
+        {live && st && <FundsEditor key={st.balances.usd.balanceCents + st.balances.usd.reserveCents} balances={st.balances} locked={taskIsActive} onSaved={() => { setError(null); void refresh(); }} onError={onError} />}
+        {live && <RecipientsCard recipients={recipients} onChanged={() => { setError(null); void refresh(); }} onError={onError} />}
+        {taskLeads ? <>{planner}{taskPanel}{invoiceCards}</> : <>{invoiceCards}{planner}{taskPanel}</>}
+        {live && invoices.length > 0 && <NewInvoiceCard recipients={recipients} defaultOpen={false} onCreated={(inv) => { setSelectedId(inv.id); setError(null); void refresh(); }} onError={onError} />}
+        <ImportCard disabled={taskIsActive} onImported={(inv) => { setSelectedId(inv.id); setError(null); void refresh(); }} onError={onError} />
       </main>
+
+      {task?.task.state === "AWAITING_APPROVAL" && task.proposal && <ReviewBar proposal={task.proposal} nowMs={nowMs} onReview={reviewPayment} />}
+
       <footer className="foot muted small">
         {live ? "Live mode: your own data. The app issues payment instructions and never moves money." : `Fictional university, providers and data. Fixtures ${config?.fixturesVersion ?? ""}.`}
       </footer>
@@ -228,7 +259,7 @@ function Login({ config, onDone }: { config: Config | null; onDone: (csrf: strin
   }
   return (
     <main className="shell narrow">
-      <h1>TuitionBridge</h1>
+      <div className="brand brand-login"><Logo size={36} /><h1 className="wordmark">TuitionBridge</h1></div>
       <ModeBadges config={config} />
       {config?.appMode === "sandbox" && <div className="sandbox-banner" role="note"><strong>SANDBOX · TEST DATA.</strong> Fictional users and providers; payments are simulated.</div>}
       <SetupBanner config={config} />

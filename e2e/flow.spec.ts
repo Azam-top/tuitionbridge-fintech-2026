@@ -265,4 +265,78 @@ test.describe("TuitionBridge browser flow (MOCK agent, SIMULATED payments)", () 
     await expect(page.getByTestId("timeline")).toBeVisible();
     await expect(page.getByTestId("timeline")).toContainText("prepare_payment");
   });
+  test("planner beside the transfer choice: recommendation, reasons, inspect another route, re-plan through the existing endpoints", async ({ page }) => {
+    await signIn(page);
+    await page.getByTestId("scenario-s1").click();
+    await page.getByTestId("confirm-invoice").click();
+    await page.getByTestId("start-task").click();
+    await expect(page.getByTestId("approval-card")).toBeVisible({ timeout: 15_000 });
+    const planner = page.getByTestId("planner");
+    await expect(page.getByTestId("recommendation")).toContainText("SteadyPay");
+    await expect(planner).toContainText("You pay USD 1,010.00 in total");
+    await expect(planner).toContainText("USD 10.00 fee");
+    await expect(planner).toContainText("Arrives about");
+    await expect(planner).toContainText("left after paying");
+    await expect(page.getByTestId("route-count")).toContainText("3 options");
+    // reasons for the other options come from the server's own exclusion messages
+    await planner.getByRole("button", { name: /Why not the other 2 options/ }).click();
+    await expect(planner).toContainText("after the confirmed deadline");
+    // inspecting another route changes the panel but not the proposal
+    await page.getByTestId("route-ok").locator("label").click();
+    await expect(planner).toContainText("FastLane Remit");
+    await expect(planner).toContainText("your proposal covers the recommended route");
+    await expect(page.getByTestId("will-debit")).toContainText("USD 1,010.00");
+    // a route's details expand and collapse
+    const toggle = page.getByRole("button", { name: /details for FastLane Remit/ });
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    await expect(page.getByTestId("route-ok")).toContainText("Estimated arrival");
+    // re-plan: fastest route, through cancel + a new task; nothing is paid
+    await page.getByTestId("pref-fastest").click();
+    await page.getByTestId("replan").click();
+    await expect(page.getByTestId("will-debit")).toContainText("USD 1,025.11", { timeout: 15_000 });
+    await expect(page.getByTestId("recommendation")).toContainText("FastLane Remit");
+    await expect(page.getByTestId("usd-balance")).toContainText("USD 1,500.00");
+  });
+
+  test("the sticky review bar leads to the approval card and focuses it", async ({ page }) => {
+    await signIn(page);
+    await page.getByTestId("scenario-s1").click();
+    await page.getByTestId("confirm-invoice").click();
+    await page.getByTestId("start-task").click();
+    await expect(page.getByTestId("review-bar")).toContainText("free after payment and reserve", { timeout: 15_000 });
+    await expect(page.getByTestId("review-bar")).toContainText("You approve every payment");
+    await page.getByTestId("review-payment").click();
+    await expect(page.locator(":focus")).toHaveAttribute("aria-label", /Approval required/);
+    await expect(page.getByTestId("approve-btn")).toBeVisible();
+  });
+
+  test("reduced motion removes the transitions, and the details still open", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await signIn(page);
+    await page.getByTestId("scenario-s1").click();
+    await page.getByTestId("confirm-invoice").click();
+    await page.getByTestId("start-task").click();
+    await expect(page.getByTestId("approval-card")).toBeVisible({ timeout: 15_000 });
+    const reveal = page.locator(".reveal").first();
+    expect(await reveal.evaluate((el) => getComputedStyle(el).transitionDuration)).toMatch(/^0s(, 0s)*$/);
+    await page.getByRole("button", { name: /Show details for/ }).first().click();
+    await expect(page.locator(".reveal[data-open='true']").first()).toBeVisible();
+  });
+
+  test("on a phone the planner sits directly before the route choice and nothing scrolls sideways", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 800 });
+    await signIn(page);
+    await page.getByTestId("scenario-s1").click();
+    await page.getByTestId("confirm-invoice").click();
+    await page.getByTestId("start-task").click();
+    await expect(page.getByTestId("approval-card")).toBeVisible({ timeout: 15_000 });
+    const p = await page.getByTestId("planner").boundingBox();
+    const r = await page.locator("#routes").boundingBox();
+    expect(p!.y).toBeLessThan(r!.y);
+    expect(r!.y - (p!.y + p!.height)).toBeLessThan(60); // adjacent, not separated by other cards
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+    const minTarget = await page.getByTestId("approve-btn").evaluate((el) => el.getBoundingClientRect().height);
+    expect(minTarget).toBeGreaterThanOrEqual(44);
+  });
 });

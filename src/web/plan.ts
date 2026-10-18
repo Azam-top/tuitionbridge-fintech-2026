@@ -1,0 +1,67 @@
+// Presentation helpers for the plan. Every figure comes from the backend (tool output, proposal, receipt); this file only
+// formats them and derives plain differences (for example "USD 12.50 more") from backend integers. It decides nothing.
+import { useEffect, useState } from "react";
+import type { RouteRow, TaskView } from "./api";
+import { fmtTime, formatUsd, tiynToInput } from "./format";
+import type { IconName } from "./icons";
+
+export type Preference = "cheapest" | "fastest";
+
+/** Routes exactly as the server ranked them in the latest successful evaluate_routes call (feasible first). */
+export function routesOf(view: TaskView | null): { routes: RouteRow[]; best: string | null; preference: string | null } | null {
+  if (!view) return null;
+  const ev = [...view.events].reverse().find((e) => e.tool === "evaluate_routes" && e.ok);
+  if (!ev?.output) return null;
+  return {
+    routes: (ev.output.routes as RouteRow[] | undefined) ?? [],
+    best: (ev.output.bestQuoteId as string | null | undefined) ?? null,
+    preference: (ev.output.preference as string | undefined) ?? null,
+  };
+}
+
+/** The same sentence the example buttons use; the server parses and validates it like any other instruction. */
+export function buildInstruction(pref: Preference, reserveCents: string): string {
+  return `Pay this invoice by its deadline, use the ${pref} feasible route, and keep USD ${tiynToInput(reserveCents) || "0"} for living costs.`;
+}
+
+/** "1 day 4 h", "6 h", "35 min" for a positive span in milliseconds. */
+export function span(ms: number): string {
+  const min = Math.round(Math.abs(ms) / 60000);
+  if (min < 90) return `${min} min`;
+  const h = Math.round(min / 60);
+  if (h < 48) return `${h} h`;
+  const d = Math.floor(h / 24);
+  const rest = h - d * 24;
+  return rest ? `${d} days ${rest} h` : `${d} days`;
+}
+
+export const centsDiff = (a: string, b: string): bigint => BigInt(a) - BigInt(b);
+
+export function diffText(a: string, b: string): string {
+  const d = centsDiff(a, b);
+  return `${formatUsd(d < 0n ? -d : d)} ${d < 0n ? "less" : "more"}`;
+}
+
+export const arrivalLine = (iso: string, deadlineIso?: string): string => {
+  if (!deadlineIso) return `Arrives about ${fmtTime(iso)}`;
+  const diff = Date.parse(deadlineIso) - Date.parse(iso);
+  return `Arrives about ${fmtTime(iso)} · ${diff >= 0 ? `${span(diff)} before the deadline` : `${span(diff)} after the deadline`}`;
+};
+
+export function iconForRoute(r: Pick<RouteRow, "provider" | "source">): IconName {
+  const n = r.provider.toLowerCase();
+  if (n.includes("card")) return "card";
+  if (r.source === "USER_DECLARED") return "bank";
+  return "swap";
+}
+
+/** Server clock aligned to the browser: expiry is judged against server time, refreshed every 10 seconds. */
+export function useServerClock(serverNowIso: string | undefined): number {
+  const [skew, setSkew] = useState(0);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => { if (serverNowIso) setSkew(Date.parse(serverNowIso) - Date.now()); }, [serverNowIso]);
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 10_000); return () => clearInterval(t); }, []);
+  return now + skew;
+}
+
+export const prefersReducedMotion = (): boolean => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
