@@ -1,10 +1,19 @@
 // Server-only configuration. Secrets stay in env and are never serialized to clients or logs.
 
+export type AppMode = "live" | "sandbox";
+
 export interface AppConfig {
   host: string;
   port: number;
   dbPath: string;
+  /** live: real users, real model, no fixtures. sandbox: separate database of clearly labeled TEST DATA for the competition check. */
+  appMode: AppMode;
+  /** True only in sandbox mode (reset endpoint, demo users, scenario data). */
   demoMode: boolean;
+  wiseQuotes: boolean;
+  nbkRates: boolean;
+  uploadDir: string;
+  maxUploadBytes: number;
   taskRateLimitPerMinute: number;
   mutateRateLimitPerMinute: number;
   llmApiKey: string | null;
@@ -30,11 +39,18 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   };
   const key = env.APP_LLM_API_KEY?.trim();
   const model = env.APP_LLM_MODEL?.trim();
+  // APP_MODE wins; APP_DEMO_MODE=1 is kept as an alias for sandbox. The default is the real (live) mode.
+  const appMode: AppMode = env.APP_MODE === "sandbox" || (env.APP_MODE === undefined && env.APP_DEMO_MODE === "1") ? "sandbox" : "live";
   return {
     host: env.APP_HOST?.trim() || "127.0.0.1",
     port: num(env.APP_PORT, 8787),
-    dbPath: env.APP_DB_PATH?.trim() || "data/tuitionbridge.sqlite",
-    demoMode: env.APP_DEMO_MODE !== "0",
+    dbPath: env.APP_DB_PATH?.trim() || (appMode === "sandbox" ? "data/sandbox.sqlite" : "data/live.sqlite"),
+    appMode,
+    demoMode: appMode === "sandbox",
+    wiseQuotes: env.APP_WISE_QUOTES === "1",
+    nbkRates: env.APP_NBK_RATES !== "0",
+    uploadDir: env.APP_UPLOAD_DIR?.trim() || (appMode === "sandbox" ? "data/uploads-sandbox" : "data/uploads"),
+    maxUploadBytes: num(env.APP_MAX_UPLOAD_BYTES, 2 * 1024 * 1024),
     llmApiKey: key ? key : null,
     llmModel: model ? model : null,
     llmBaseUrl: env.APP_LLM_BASE_URL?.trim() || null,
@@ -53,7 +69,16 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   };
 }
 
-/** LIVE only when a key AND model are configured. Does not prove the key works. */
+/**
+ * LIVE when a key AND model are configured (this does not prove the key works).
+ * Without them: the sandbox falls back to the labeled MOCK agent; the live mode has NO fallback and needs setup.
+ */
+export type AgentStatus = "LIVE" | "MOCK" | "NOT_CONFIGURED";
+export function agentStatus(c: AppConfig): AgentStatus {
+  if (c.llmApiKey && c.llmModel) return "LIVE";
+  return c.appMode === "sandbox" ? "MOCK" : "NOT_CONFIGURED";
+}
+/** Kept for callers that only distinguish a real model from the stand-in. */
 export function agentMode(c: AppConfig): "LIVE" | "MOCK" {
   return c.llmApiKey && c.llmModel ? "LIVE" : "MOCK";
 }

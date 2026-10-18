@@ -37,10 +37,21 @@ CREATE TABLE IF NOT EXISTS ledger_entries (
   delta_minor TEXT NOT NULL,
   created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS app_meta (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+-- Recipients the app trusts. origin 'test_fixture' exists only in the sandbox; 'user_attested' rows are created by the
+-- signed-in user from an official source they name. A document can never create or change a row.
 CREATE TABLE IF NOT EXISTS trusted_recipients (
   registry_id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
-  account TEXT NOT NULL
+  account TEXT NOT NULL,
+  owner_user_id TEXT REFERENCES users(id),
+  origin TEXT NOT NULL DEFAULT 'test_fixture' CHECK (origin IN ('test_fixture','user_attested')),
+  source_url TEXT,
+  source_note TEXT,
+  attested_at TEXT
 );
 CREATE TABLE IF NOT EXISTS invoices (
   id TEXT PRIMARY KEY,
@@ -54,7 +65,7 @@ CREATE TABLE IF NOT EXISTS invoices (
   source_type TEXT NOT NULL,
   notes TEXT NOT NULL DEFAULT '',
   ambiguous_fields TEXT NOT NULL DEFAULT '[]',
-  status TEXT NOT NULL CHECK (status IN ('DRAFT','BLOCKED','CONFIRMED','PAID')),
+  status TEXT NOT NULL CHECK (status IN ('DRAFT','BLOCKED','CONFIRMED','INSTRUCTED','PAID')),
   issues_json TEXT NOT NULL DEFAULT '[]',
   created_at TEXT NOT NULL,
   confirmed_at TEXT,
@@ -78,7 +89,10 @@ CREATE TABLE IF NOT EXISTS quotes (
   est_arrival_at TEXT NOT NULL,
   eligible INTEGER NOT NULL,
   ineligible_reason TEXT,
-  provenance TEXT NOT NULL
+  provenance TEXT NOT NULL,
+  source_note TEXT,
+  observed_at TEXT,
+  external_ref TEXT
 );
 CREATE TABLE IF NOT EXISTS proposals (
   id TEXT PRIMARY KEY,
@@ -89,7 +103,7 @@ CREATE TABLE IF NOT EXISTS proposals (
   hash TEXT NOT NULL,
   payload_json TEXT NOT NULL,
   display_json TEXT NOT NULL,
-  status TEXT NOT NULL CHECK (status IN ('PENDING','EXECUTED','SUPERSEDED','REJECTED')),
+  status TEXT NOT NULL CHECK (status IN ('PENDING','EXECUTED','INSTRUCTED','SUPERSEDED','REJECTED')),
   created_at TEXT NOT NULL,
   expires_at TEXT NOT NULL
 );
@@ -111,7 +125,7 @@ CREATE TABLE IF NOT EXISTS agent_tasks (
   invoice_id TEXT NOT NULL REFERENCES invoices(id),
   instruction TEXT NOT NULL,
   intent_json TEXT NOT NULL,
-  state TEXT NOT NULL CHECK (state IN ('RUNNING','AWAITING_APPROVAL','EXECUTING','COMPLETED','BLOCKED','FAILED','CANCELLED')),
+  state TEXT NOT NULL CHECK (state IN ('RUNNING','AWAITING_APPROVAL','EXECUTING','APPROVED','COMPLETED','BLOCKED','FAILED','CANCELLED')),
   mode TEXT NOT NULL CHECK (mode IN ('LIVE','MOCK')),
   model TEXT,
   tool_calls INTEGER NOT NULL DEFAULT 0,
@@ -149,6 +163,45 @@ CREATE TABLE IF NOT EXISTS payments (
   receipt_json TEXT NOT NULL,
   created_at TEXT NOT NULL
 );
+-- Live mode: the app does not move money. After the human approves an exact proposal it issues a payment INSTRUCTION;
+-- the user pays outside the app and may attach evidence. Nothing here is a bank's confirmation.
+CREATE TABLE IF NOT EXISTS payment_instructions (
+  id TEXT PRIMARY KEY,
+  owner_user_id TEXT NOT NULL REFERENCES users(id),
+  proposal_id TEXT NOT NULL UNIQUE REFERENCES proposals(id),
+  invoice_id TEXT NOT NULL REFERENCES invoices(id),
+  approval_id TEXT NOT NULL UNIQUE REFERENCES approvals(id),
+  instruction_json TEXT NOT NULL,
+  instruction_hash TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('ISSUED','CANCELLED')),
+  created_at TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_instruction_active_invoice ON payment_instructions(invoice_id) WHERE status = 'ISSUED';
+CREATE TABLE IF NOT EXISTS payment_evidence (
+  id TEXT PRIMARY KEY,
+  instruction_id TEXT NOT NULL REFERENCES payment_instructions(id),
+  owner_user_id TEXT NOT NULL REFERENCES users(id),
+  kind TEXT NOT NULL CHECK (kind IN ('user_marked_paid','bank_confirmation_upload')),
+  reference TEXT,
+  filename TEXT,
+  mime TEXT,
+  size_bytes INTEGER,
+  sha256 TEXT,
+  stored_path TEXT,
+  created_at TEXT NOT NULL
+);
+-- Official reference rates (never an offer). One row per retrieval, with the hash of the exact response body.
+CREATE TABLE IF NOT EXISTS reference_rates (
+  id TEXT PRIMARY KEY,
+  source TEXT NOT NULL,
+  pair TEXT NOT NULL,
+  rate TEXT NOT NULL,
+  quantity TEXT NOT NULL,
+  effective_date TEXT NOT NULL,
+  retrieved_at TEXT NOT NULL,
+  body_sha256 TEXT NOT NULL,
+  url TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS idempotency_keys (
   owner_user_id TEXT NOT NULL,
   key TEXT NOT NULL,
@@ -169,17 +222,30 @@ CREATE TABLE IF NOT EXISTS audit_events (
 CREATE INDEX IF NOT EXISTS ix_audit_owner ON audit_events(owner_user_id, ts);
 `;
 
-export function openDb(path: string): Db {
+/**
+ * Opens (and creates) the database. When `mode` is given, the file is stamped with it and any later open in the other
+ * mode is refused, so test data and real data can never end up in the same file.
+ */
+export function openDb(path: string, mode?: "live" | "sandbox"): Db {
   if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
   const db = new Database(path);
   db.pragma("foreign_keys = ON");
   db.pragma("busy_timeout = 5000");
   if (path !== ":memory:") db.pragma("journal_mode = WAL");
   db.exec(SCHEMA);
+  if (mode) {
+    const cur = db.prepare("SELECT value FROM app_meta WHERE key = 'mode'").get() as { value: string } | undefined;
+    if (!cur) db.prepare("INSERT INTO app_meta (key, value) VALUES ('mode', ?)").run(mode);
+    else if (cur.value !== mode) {
+      db.close();
+      throw new Error(`Refusing to open ${path}: it was created in ${cur.value} mode, not ${mode}. Live and sandbox data are kept in separate database files.`);
+    }
+  }
   return db;
 }
 
 export const DYNAMIC_TABLES = [
+  "payment_evidence", "payment_instructions", "reference_rates",
   "audit_events", "idempotency_keys", "payments", "agent_events", "agent_tasks", "approvals",
   "proposals", "quotes", "invoices", "ledger_entries", "ledger_accounts", "sessions", "trusted_recipients", "users",
 ];

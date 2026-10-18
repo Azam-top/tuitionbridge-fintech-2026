@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "TuitionBridge: competition prototype. Fictional data, simulated payments only.",
+  "description": "TuitionBridge: helps international students choose and approve tuition payments while protecting their living budget. Live mode (real data) plus a separate labeled sandbox of test data.",
   "engines": {
     "node": ">=24"
   },
@@ -11,10 +11,12 @@
     "dev:server": "tsx watch src/server/index.ts",
     "dev:web": "vite",
     "start": "node --import tsx src/server/index.ts",
+    "start:sandbox": "APP_MODE=sandbox node --import tsx src/server/index.ts",
     "build": "vite build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
+    "check:sources": "tsx scripts/check-sources.ts",
     "reset-demo": "tsx src/server/cli-reset.ts",
     "smoke:live": "tsx scripts/live-smoke.ts",
     "eval": "tsx scripts/eval/run.ts",

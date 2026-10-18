@@ -37,6 +37,10 @@ export interface ProposalPayload {
   reserveCents: string;
   preference: Preference;
   proposalExpiresAt: string;
+  /** Where the chosen quote came from. Bound by the hash so the approved terms always show their source. */
+  quoteProvenance: string;
+  quoteSourceNote: string | null;
+  quoteObservedAt: string | null;
   /** Evidence that the server ranked the current quote set and this quote won the stated objective. */
   selection: {
     basis: "server_ranking_v1";
@@ -161,6 +165,7 @@ export function prepareProposal(ctx: Ctx, input: PrepareInput): ProposalView {
       surplusTiyn: ev.surplusTiyn, quoteId: quote.id, quoteVersion: quote.version, providerId: quote.providerId,
       providerName: quote.providerName, estArrivalAt: quote.estArrivalAt, deadlineAt: inv.due_at,
       quoteExpiresAt: quote.expiresAt, reserveCents: input.reserveCents, preference: input.preference, proposalExpiresAt: expiresAt,
+      quoteProvenance: quote.provenance, quoteSourceNote: quote.sourceNote ?? null, quoteObservedAt: quote.observedAt ?? null,
       selection,
     };
     const hash = hashPayload(payload);

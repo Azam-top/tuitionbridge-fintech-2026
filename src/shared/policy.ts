@@ -28,7 +28,11 @@ export interface QuoteRecord {
   estArrivalAt: string; // ISO (estimate, not a guarantee)
   eligible: boolean;
   ineligibleReason: string | null;
-  provenance: string; // always "SIMULATED"
+  /** SIMULATED (sandbox test data) | USER_DECLARED (typed in by the user from a bank/provider) | PROVIDER_LIVE (fetched from a provider API). */
+  provenance: string;
+  sourceNote?: string | null;
+  observedAt?: string | null;
+  externalRef?: string | null;
 }
 
 export interface RouteEvaluation {

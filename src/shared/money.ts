@@ -72,3 +72,10 @@ function formatMinor(minor: bigint, symbol: string): string {
 
 export const formatUsd = (cents: bigint | string): string => formatMinor(BigInt(cents), "USD");
 export const formatKzt = (tiyn: bigint | string): string => formatMinor(BigInt(tiyn), "KZT");
+
+/** Exact decimal text ("1,234.50") -> minor-unit BigInt with at most 2 fractional digits; no floating point. */
+export function decimalToMinor(text: string, label = "amount"): bigint {
+  const m = /^(\d{1,3}(?:,\d{3})+|\d{1,13})(?:\.(\d{1,2}))?$/.exec(text.trim());
+  if (!m) throw new MoneyError(`${label} must be a plain decimal number with at most 2 decimals`);
+  return BigInt(m[1].replace(/,/g, "")) * 100n + BigInt((m[2] ?? "").padEnd(2, "0") || "0");
+}

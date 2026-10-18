@@ -19,11 +19,18 @@ import { SCENARIOS, FIXTURES_VERSION, type ScenarioId } from "../fixtures.js";
 import { getTask, type Runner, type TaskRow } from "../agent/runner.js";
 import type { LlmClient } from "../agent/types.js";
 import { audit } from "../services/audit.js";
+import { registerUser, declareFunds } from "../services/accounts.js";
+import { attestRecipient, listRecipients } from "../services/recipients.js";
+import { addManualOffer, listOffers, refreshProviderOffers } from "../services/offers.js";
+import { latestReference, refreshReferenceRate } from "../services/reference-rate.js";
+import { cancelInstruction, getInstruction, instructionForProposal, listInstructions, markPaidByUser, uploadConfirmation } from "../services/instructions.js";
+import { agentStatus } from "../config.js";
 
 const STATUS: Partial<Record<ErrorCode, number>> = {
   NOT_FOUND: 404, FORBIDDEN_TIER: 403, VALIDATION: 400, INTENT_CONFLICT: 400, RESERVE_LOWERING: 400, DEMO_ONLY: 403,
   TASK_ACTIVE: 409, TASK_STATE: 409, DUPLICATE_PAYMENT: 409, IDEMPOTENCY_CONFLICT: 409, APPROVAL_CONSUMED: 409, PROPOSAL_NOT_PENDING: 409,
   INVOICE_ALREADY_PAID: 409, PROVIDER_FAILURE: 502,
+  AGENT_NOT_CONFIGURED: 503, WRONG_MODE: 403, NO_OFFERS: 409, SOURCE_UNAVAILABLE: 503,
 };
 
 export const COOKIE = "tb_session";
@@ -105,10 +112,18 @@ export function buildApp(deps: AppDeps): FastifyInstance {
 
   const publicConfig = () => {
     const liveEvidence = (ctx.db.prepare("SELECT COUNT(*) c FROM agent_tasks WHERE mode='LIVE' AND usage_known=1").get() as { c: number }).c;
+    const live = ctx.config.appMode === "live";
     return {
+      appMode: ctx.config.appMode,
       agentMode: agentMode(ctx.config),
+      agentStatus: agentStatus(ctx.config),
+      llmModel: ctx.config.llmModel,
       liveVerifiedInThisDatabase: liveEvidence > 0,
-      payments: "SIMULATED" as const,
+      /** sandbox: payments are SIMULATED in a test ledger. live: the app moves no money; it issues instructions. */
+      payments: (live ? "NOT_MOVED_BY_APP" : "SIMULATED") as "SIMULATED" | "NOT_MOVED_BY_APP",
+      registrationOpen: live,
+      wiseQuotes: ctx.config.wiseQuotes,
+      nbkRates: ctx.config.nbkRates,
       replay: false,
       demoMode: ctx.config.demoMode,
       scenarios: ctx.config.demoMode ? SCENARIOS : [],
@@ -120,6 +135,16 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   app.get("/api/config", async () => publicConfig());
 
   // ---- auth ----
+  app.post("/api/auth/register", async (req, reply) => {
+    if (!loginLimiter.allow(`ip:${req.ip}`)) return reply.code(429).send({ error: { code: "RATE_LIMITED", message: "Too many attempts. Wait a minute." } });
+    const body = parseInput(z.object({ email: z.string().max(200), displayName: z.string().max(80), password: z.string().max(200) }).strict(), req.body);
+    registerUser(ctx, body);
+    const r = login(ctx.db, ctx.clock, body.email, body.password)!;
+    reply.setCookie(COOKIE, r.token, { httpOnly: true, sameSite: "strict", path: "/", secure: ctx.config.cookieSecure, maxAge: Math.floor(SESSION_TTL_MS / 1000) });
+    reply.code(201);
+    return { user: { email: r.user.email, displayName: r.user.displayName, maxTier: r.user.maxTier }, csrfToken: r.user.csrfToken };
+  });
+
   app.post("/api/auth/login", async (req, reply) => {
     if (!loginLimiter.allow(`ip:${req.ip}`)) return reply.code(429).send({ error: { code: "RATE_LIMITED", message: "Too many sign-in attempts. Wait a minute." } });
     const body = parseInput(z.object({ email: z.string().max(200), password: z.string().max(200) }).strict(), req.body);
@@ -147,10 +172,14 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     proposalId: t.proposal_id, paymentId: t.payment_id, summary: t.summary, error: t.error,
   });
   app.get("/api/state", guard("read", (_req, _reply, u) => {
+    const invoices = listInvoices(ctx, u.userId);
     const tasks = ctx.db.prepare("SELECT * FROM agent_tasks WHERE owner_user_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 1").all(u.userId) as TaskRow[];
     return {
       user: { email: u.email, displayName: u.displayName, maxTier: u.maxTier },
-      config: publicConfig(), balances: getBalances(ctx, u.userId), invoices: listInvoices(ctx, u.userId),
+      config: publicConfig(), balances: getBalances(ctx, u.userId), invoices: invoices,
+      recipients: listRecipients(ctx, u.userId),
+      offers: Object.fromEntries(invoices.filter((i) => i.status === "CONFIRMED").map((i) => [i.id, listOffers(ctx, u.userId, i.id)])),
+      instructions: listInstructions(ctx, u.userId), reference: latestReference(ctx),
       latestTask: tasks[0] ? taskSummary(runner.refresh(u.userId, tasks[0].id)) : null,
       now: ctx.clock.now().toISOString(),
     };
@@ -171,6 +200,35 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   app.patch("/api/invoices/:id", guard("propose", (req, _r, u) => updateInvoice(ctx, u.userId, (req.params as { id: string }).id, req.body)));
   app.post("/api/invoices/:id/confirm", guard("propose", (req, _r, u) => confirmInvoice(ctx, u.userId, (req.params as { id: string }).id)));
 
+  // ---- live mode: declared funds, attested recipients, offers, reference rate ----
+  app.put("/api/account/funds", guard("propose", (req, _r, u) => declareFunds(ctx, u.userId, req.body)));
+  app.get("/api/recipients", guard("read", (_req, _r, u) => ({ recipients: listRecipients(ctx, u.userId) })));
+  app.post("/api/recipients", guard("propose", (req, reply, u) => { reply.code(201); return attestRecipient(ctx, u.userId, req.body); }));
+  app.get("/api/reference-rate", guard("read", async () => {
+    const r = await refreshReferenceRate(ctx);
+    return { status: r.status, reference: r.reference };
+  }));
+  app.get("/api/invoices/:id/offers", guard("read", (req, _r, u) => ({ offers: listOffers(ctx, u.userId, (req.params as { id: string }).id), reference: latestReference(ctx) })));
+  app.post("/api/invoices/:id/offers", guard("propose", (req, reply, u) => {
+    reply.code(201);
+    const id = (req.params as { id: string }).id;
+    addManualOffer(ctx, u.userId, { ...(req.body as object), invoiceId: id });
+    return { offers: listOffers(ctx, u.userId, id) };
+  }));
+  app.post("/api/invoices/:id/offers/refresh", guard("propose", async (req, _r, u) => {
+    const id = (req.params as { id: string }).id;
+    await refreshReferenceRate(ctx);
+    const result = await refreshProviderOffers(ctx, u.userId, id);
+    return { result, offers: listOffers(ctx, u.userId, id), reference: latestReference(ctx) };
+  }));
+
+  // ---- live mode: payment instruction and user-supplied evidence (never bank verification) ----
+  app.get("/api/instructions", guard("read", (_req, _r, u) => ({ instructions: listInstructions(ctx, u.userId) })));
+  app.get("/api/instructions/:id", guard("read", (req, _r, u) => getInstruction(ctx, u.userId, (req.params as { id: string }).id)));
+  app.post("/api/instructions/:id/mark-paid", guard("propose", (req, _r, u) => markPaidByUser(ctx, u.userId, (req.params as { id: string }).id, req.body)));
+  app.post("/api/instructions/:id/confirmation", { bodyLimit: 4 * 1024 * 1024 }, guard("propose", (req, _r, u) => uploadConfirmation(ctx, u.userId, (req.params as { id: string }).id, req.body)));
+  app.post("/api/instructions/:id/cancel", guard("propose", (req, _r, u) => cancelInstruction(ctx, u.userId, (req.params as { id: string }).id)));
+
   // ---- tasks ----
   function taskView(userId: string, id: string) {
     const t = runner.refresh(userId, id);
@@ -188,6 +246,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
         usage: { toolCalls: t.tool_calls, modelRequests: t.model_requests, retries: t.retries, latencyMs: t.latency_ms, tokensKnown: t.usage_known === 1, inputTokens: t.usage_known ? t.input_tokens : null, outputTokens: t.usage_known ? t.output_tokens : null },
       },
       events, proposal, receipt: pay ? (JSON.parse(pay.receipt_json) as unknown) : null,
+      instruction: t.proposal_id ? instructionForProposal(ctx, userId, t.proposal_id) : null,
     };
   }
   app.post("/api/tasks", guard("propose", (req, reply, u) => {
@@ -212,6 +271,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
 
   // ---- direct execution entry point: same server policy as the agent tool ----
   app.post("/api/payments/execute", guard("execute", (req, _r, u) => {
+    if (ctx.config.appMode !== "sandbox") throw new PolicyError("WRONG_MODE", "The simulated ledger exists only in the sandbox. The live mode issues payment instructions instead.");
     const b = parseInput(z.object({ proposalId: z.string().max(64), approvalId: z.string().max(64), idempotencyKey: z.string().max(100) }).strict(), req.body);
     return executePayment(ctx, { ownerId: u.userId, tier: u.maxTier, proposalId: b.proposalId, approvalId: b.approvalId, idempotencyKey: b.idempotencyKey });
   }));
