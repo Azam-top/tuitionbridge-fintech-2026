@@ -2,11 +2,30 @@
   "kind": "deterministic-mock",
   "label": "Deterministic evaluation: MOCK agent for model-driven cases and scripted/direct drivers for adversarial and failure cases. It exercises the server's tools and policies. It says nothing about how a real model behaves.",
   "casesVersion": "2026-10-v1",
-  "generatedAt": "2026-10-12T05:28:34.510Z",
+  "generatedAt": "2026-10-18T06:04:26.858Z",
+  "provenance": {
+    "schema": 1,
+    "driver": "deterministic-mock+scripted",
+    "endpoint": "none",
+    "sourceCommit": "9a3f2b57738cc8169f21f790040df4e6ccd0d1a6",
+    "sourceDirty": false,
+    "runAt": "2026-10-18T06:04:26.858Z",
+    "parameters": {
+      "live": false,
+      "pack": null,
+      "maxCases": null,
+      "maxTotalTokens": null,
+      "caseTimeoutSeconds": null,
+      "reportOnly": false,
+      "casesVersion": "2026-10-v1",
+      "taskTokenBudgetCap": null
+    },
+    "paymentsEnvironment": "SIMULATED"
+  },
   "environment": {
     "node": "v26.11.1",
     "platform": "linux",
-    "gitHead": "f45121e",
+    "gitHead": "9a3f2b5",
     "agentMode": "MOCK",
     "model": null,
     "payments": "SIMULATED"
@@ -53,6 +72,12 @@
       "total": 2
     }
   },
+  "gate": {
+    "mode": "release-gate",
+    "ok": true,
+    "failures": [],
+    "exitCode": 0
+  },
   "targets": {
     "minPassed": 27,
     "criticalAllPass": true,
@@ -63,7 +88,7 @@
     "tokensReported": false,
     "note": "MOCK agent reports no token usage; no cost incurred."
   },
-  "totalLatencyMs": 434,
+  "totalLatencyMs": 316,
   "cases": [
     {
       "id": "ord-01",
@@ -94,8 +119,9 @@
       "mismatches": [],
       "invariantViolations": [],
       "passed": true,
-      "latencyMs": 127,
-      "tokens": null
+      "latencyMs": 92,
+      "tokens": null,
+      "modelRequests": null
     },
     {
       "id": "ord-02",
@@ -127,8 +153,9 @@
       "mismatches": [],
       "invariantViolations": [],
       "passed": true,
-      "latencyMs": 14,
-      "tokens": null
+      "latencyMs": 10,
+      "tokens": null,
+      "modelRequests": null
     },
     {
       "id": "ord-03",
@@ -158,8 +185,9 @@
       "mismatches": [],
       "invariantViolations": [],
       "passed": true,
-      "latencyMs": 9,
-      "tokens": null
+      "latencyMs": 7,
+      "tokens": null,
+      "modelRequests": null
     },
     {
       "id": "ord-04",
@@ -190,8 +218,9 @@
       "mismatches": [],
       "invariantViolations": [],
       "passed": true,
-      "latencyMs": 10,
-      "tokens": null
+      "latencyMs": 6,
+      "tokens": null,
+      "modelRequests": null
     },
     {
       "id": "ord-05",
@@ -222,8 +251,9 @@
       "mismatches": [],
       "invariantViolations": [],
       "passed": true,
-      "latencyMs": 17,
-      "tokens": null
+      "latencyMs": 12,
+      "tokens": null,
+      "modelRequests": null
     },
     {
       "id": "lang-01",
@@ -254,8 +284,9 @@
       "mismatches": [],
       "invariantViolations": [],
       "passed": true,
-      "latencyMs": 10,
-      "tokens": null
+      "latencyMs": 9,
+      "tokens": null,
+      "modelRequests": null
     },
     {
       "id": "lang-02",
@@ -285,8 +316,9 @@
       "mismatches": [],
       "invariantViolations": [],
       "passed": true,
-      "latencyMs": 10,
-      "tokens": null
+      "latencyMs": 6,
+      "tokens": null,
+      "modelRequests": null
     },
     {
       "id": "lang-03",
@@ -316,8 +348,9 @@
       "mismatches": [],
       "invariantViolations": [],
       "passed": true,
-      "latencyMs": 8,
-      "tokens": null
+      "latencyMs": 7,
+      "tokens": null,
+      "modelRequests": null
     },
     {
       "id": "bnd-01",
@@ -348,8 +381,9 @@
       "mismatches": [],
       "invariantViolations": [],
       "passed": true,
-      "latencyMs": 15,
-      "tokens": null
+      "latencyMs": 10,
+      "tokens": null,
+      "modelRequests": null
     },
     {
       "id": "bnd-02",
@@ -380,8 +414,9 @@
       "mismatches": [],
       "invariantViolations": [],
       "passed": true,
-      "latencyMs": 8,
-      "tokens": null
+      "latencyMs": 5,
+      "tokens": null,
+      "modelRequests": null
     },
     {
       "id": "bnd-03",
@@ -404,7 +439,8 @@
       "invariantViolations": [],
       "passed": true,
       "latencyMs": 2,
-      "tokens": null
+      "tokens": null,
+      "modelRequests": null
     },
     {
       "id": "bnd-04",
@@ -426,8 +462,9 @@
       "mismatches": [],
       "invariantViolations": [],
       "passed": true,
-      "latencyMs": 2,
-      "tokens": null
+      "latencyMs": 1,
+      "tokens": null,
+      "modelRequests": null
     },
     {
       "id": "bnd-05",
@@ -457,8 +494,9 @@
       "mismatches": [],
       "invariantViolations": [],
       "passed": true,
-      "latencyMs": 10,
-      "tokens": null
+      "latencyMs": 7,
+      "tokens": null,
+      "modelRequests": null
     },
     {
       "id": "rec-01",
@@ -487,7 +525,8 @@
       "invariantViolations": [],
       "passed": true,
       "latencyMs": 9,
-      "tokens": null
+      "tokens": null,
+      "modelRequests": null
     },
     {
       "id": "rec-02",
@@ -515,8 +554,9 @@
       "mismatches": [],
       "invariantViolations": [],
       "passed": true,
-      "latencyMs": 11,
-      "tokens": null
+      "latencyMs": 7,
+      "tokens": null,
+      "modelRequests": null
     },
     {
       "id": "rec-03",
@@ -540,8 +580,9 @@
       "mismatches": [],
       "invariantViolations": [],
       "passed": true,
-      "latencyMs": 21,
-      "tokens": null
+      "latencyMs": 15,
+      "tokens": null,
+      "modelRequests": null
     },
     {
       "id": "auth-01",
@@ -561,8 +602,9 @@
       "mismatches": [],
       "invariantViolations": [],
       "passed": true,
-      "latencyMs": 11,
-      "tokens": null
+      "latencyMs": 7,
+      "tokens": null,
+      "modelRequests": null
     },
     {
       "id": "auth-02",
@@ -582,8 +624,9 @@
       "mismatches": [],
       "invariantViolations": [],
       "passed": true,
-      "latencyMs": 9,
-      "tokens": null
+      "latencyMs": 7,
+      "tokens": null,
+      "modelRequests": null
     },
     {
       "id": "auth-03",
@@ -605,8 +648,9 @@
       "mismatches": [],
       "invariantViolations": [],
       "passed": true,
-      "latencyMs": 13,
-      "tokens": null
+      "latencyMs": 6,
+      "tokens": null,
+      "modelRequests": null
     },
     {
       "id": "auth-04",
@@ -626,8 +670,9 @@
       "mismatches": [],
       "invariantViolations": [],
       "passed": true,
-      "latencyMs": 10,
-      "tokens": null
+      "latencyMs": 7,
+      "tokens": null,
+      "modelRequests": null
     },
     {
       "id": "inj-01",
@@ -660,7 +705,8 @@
       "invariantViolations": [],
       "passed": true,
       "latencyMs": 8,
-      "tokens": null
+      "tokens": null,
+      "modelRequests": null
     },
     {
       "id": "inj-02",
@@ -703,8 +749,9 @@
       "mismatches": [],
       "invariantViolations": [],
       "passed": true,
-      "latencyMs": 9,
-      "tokens": null
+      "latencyMs": 6,
+      "tokens": null,
+      "modelRequests": null
     },
     {
       "id": "inj-03",
@@ -724,8 +771,9 @@
       "mismatches": [],
       "invariantViolations": [],
       "passed": true,
-      "latencyMs": 3,
-      "tokens": null
+      "latencyMs": 2,
+      "tokens": null,
+      "modelRequests": null
     },
     {
       "id": "inj-04",
@@ -765,8 +813,9 @@
       "mismatches": [],
       "invariantViolations": [],
       "passed": true,
-      "latencyMs": 6,
-      "tokens": null
+      "latencyMs": 5,
+      "tokens": null,
+      "modelRequests": null
     },
     {
       "id": "dup-01",
@@ -788,8 +837,9 @@
       "mismatches": [],
       "invariantViolations": [],
       "passed": true,
-      "latencyMs": 11,
-      "tokens": null
+      "latencyMs": 8,
+      "tokens": null,
+      "modelRequests": null
     },
     {
       "id": "dup-02",
@@ -809,8 +859,9 @@
       "mismatches": [],
       "invariantViolations": [],
       "passed": true,
-      "latencyMs": 11,
-      "tokens": null
+      "latencyMs": 8,
+      "tokens": null,
+      "modelRequests": null
     },
     {
       "id": "dup-03",
@@ -840,8 +891,9 @@
       "mismatches": [],
       "invariantViolations": [],
       "passed": true,
-      "latencyMs": 12,
-      "tokens": null
+      "latencyMs": 10,
+      "tokens": null,
+      "modelRequests": null
     },
     {
       "id": "dup-04",
@@ -861,8 +913,9 @@
       "mismatches": [],
       "invariantViolations": [],
       "passed": true,
-      "latencyMs": 14,
-      "tokens": null
+      "latencyMs": 9,
+      "tokens": null,
+      "modelRequests": null
     },
     {
       "id": "prov-01",
@@ -892,8 +945,9 @@
       "mismatches": [],
       "invariantViolations": [],
       "passed": true,
-      "latencyMs": 27,
-      "tokens": null
+      "latencyMs": 22,
+      "tokens": null,
+      "modelRequests": null
     },
     {
       "id": "prov-02",
@@ -926,8 +980,9 @@
       "mismatches": [],
       "invariantViolations": [],
       "passed": true,
-      "latencyMs": 7,
-      "tokens": null
+      "latencyMs": 6,
+      "tokens": null,
+      "modelRequests": null
     }
   ]
 }
