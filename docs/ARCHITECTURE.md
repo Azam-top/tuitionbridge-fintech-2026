@@ -53,3 +53,15 @@ Manual form, a synthetic example, pasted text and text-based PDFs (`pdfjs-dist`,
 
 ## Modes and labels
 `AGENT: MOCK|LIVE`, `PAYMENTS: SIMULATED` (always), `REPLAY` for the offline evidence viewer. LIVE shows "(unverified)" until a LIVE task with provider-reported usage exists in the database.
+
+## Live mode and sandbox (added)
+
+`APP_MODE=live` (default) or `sandbox`. The database file is stamped in `app_meta`; the wrong mode refuses to open it.
+
+**Sources (live).** `services/offers.ts` turns the Wise public quote response into quote rows (`provenance = PROVIDER_LIVE`, with rate type, expiry, creation time, price reference) and stores user-entered offers (`USER_DECLARED`, with source note and observation time). An option is kept only if `ceil(tuition / rate) + fee` equals Wise's `sourceAmount` to the cent. `services/reference-rate.ts` stores the NBK USD rate with effective date, retrieval time and the SHA-256 of the response body. Network calls happen before the agent loop (never in a tool and never inside a database transaction).
+
+**Agent (live).** `runner.preparePhase` gathers sources first, then runs the same bounded loop. `get_quotes` only returns stored, unexpired quotes (no quote is ever issued by the server); an empty set gives `NO_OFFERS`. The proposal payload binds `quoteProvenance`, `quoteSourceNote` and `quoteObservedAt`. The server still re-ranks and rejects a non-optimal quote.
+
+**Execution (live).** `services/instructions.ts` runs one synchronous transaction after the human approval: re-checks hash, approval, quote expiry, deadline, funds and reserve, writes `payment_instructions`, consumes the approval and locks the invoice (`INSTRUCTED`). No ledger entry is written. `payment_evidence` stores the user's mark and uploads (signature-checked PDF/PNG/JPEG, size-capped, SHA-256, owner-scoped); labels say the app did not verify them. Task state `APPROVED` means "instruction issued", never "paid".
+
+**Sandbox.** Unchanged: fixtures, `MockLlm`, `execution.ts` with the simulated ledger, scenarios and the 30 evaluation cases.

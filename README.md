@@ -1,63 +1,75 @@
 # TuitionBridge
 
-A competition prototype (2026 Shenzhen International FinTech Competition, International Track, Topic C). An international student gives an agent a tuition invoice, a deadline, balances and a living-expense reserve. The agent compares three **simulated** USD→KZT routes, prepares a feasible payment, **waits for the student's approval**, then executes it in a local sandbox ledger and produces a receipt with tool-call evidence.
-
-**Everything is synthetic.** Fictional university, fictional providers, fake accounts. No real money moves and no real bank or payment provider is contacted. The UI always shows `PAYMENTS: SIMULATED`, and `AGENT: MOCK` unless a model key is configured.
+An assistant that helps an international student **choose and approve a tuition payment while protecting their living budget**. You give it a real invoice, a deadline and the USD you have; it compares payment options from named sources, prepares **one immutable proposal**, waits for **your explicit approval**, and then issues a **payment instruction**. Built for the 2026 Shenzhen International FinTech Competition, International Track, Topic C (USD→KZT tuition).
 
 Repository: <https://github.com/Azam-top/tuitionbridge-fintech-2026>
 
-## Install and run
+## Two modes, kept apart
 
-Requires Node ≥ 24 (developed and tested on Node 26.11; Node 24 not run). `better-sqlite3` is a native module; npm 12 blocks install scripts by default, and `package.json` already allow-lists `better-sqlite3` and `esbuild`. If `npm install` still warns, run `npm install-scripts approve better-sqlite3 esbuild`.
+| | **LIVE** (default, the real application) | **SANDBOX** (competition check) |
+|---|---|---|
+| Users | you register; nothing is seeded | fictional test users (documented below) |
+| Data | your own invoice, funds and recipients | fictional university, providers, balances |
+| Model | a real model is **required**; without it the UI says *Setup required* and planning is disabled. There is no stand-in agent | the labeled **MOCK** stand-in works without a key |
+| Payment options | Wise public quote endpoint (provider API) and offers **you enter** with source and time; NBK rate as a reference only | three fictional providers, labeled test data |
+| After approval | the app issues a **payment instruction**; it **moves no money**. You pay in your bank or Wise | a simulated ledger executes the payment (**SIMULATED**) |
+| Database | `data/live.sqlite` | `data/sandbox.sqlite` |
+
+A database file is stamped with its mode; opening a live file in sandbox mode (or the reverse) is refused, so test data and real data cannot mix. The sandbox shows a banner and badges (`MODE: SANDBOX`, `PAYMENTS: SIMULATED`).
+
+## Install and run (local)
+
+Requires Node ≥ 24 (developed and tested on Node 26.11; Node 24 not run). `better-sqlite3` is native; npm 12 blocks install scripts by default and `package.json` already allow-lists `better-sqlite3` and `esbuild` (if `npm install` still warns: `npm install-scripts approve better-sqlite3 esbuild`).
 
 ```bash
 npm install
-npm run build          # builds the UI to dist/web
-npm run start          # http://127.0.0.1:8787 (loopback only); seeds a demo DB on first run
+cp .env.example .env        # then set APP_LLM_API_KEY and APP_LLM_MODEL (yours; never commit .env)
+npm run build
+npm run start               # LIVE mode on http://127.0.0.1:8787 (loopback only)
+npm run start:sandbox       # SANDBOX test data; no key needed
+npm run check:sources       # read-only check of the real NBK and Wise sources
 ```
 
-Local demo accounts (synthetic, local only): `alice@demo.local` / `demo-alice-2026` and `bob@demo.local` / `demo-bob-2026`.
+**Live walk-through:** register → *Set up* (declare your USD and the reserve to keep; add your university as a **trusted recipient** from its official payment page) → enter the invoice (or upload a text PDF) and confirm it → get **live Wise quotes** and/or enter an offer from your bank → *Plan my payment* → review the routes and where each offer came from → **Approve** → follow the **payment instruction** outside the app → optionally *mark paid* or upload your confirmation.
 
-**Reset:** the "Demo scenarios" panel resets all demo data and loads a scenario (successful payment; cheapest route rejected for lateness; malicious invoice; insufficient funds; more under "More datasets"). From the terminal: `npm run reset-demo`. The deadline is always 48 h after a reset; quotes expire after 15 minutes (plan again for fresh quotes). `APP_DEMO_MODE=0` disables the reset endpoint.
+Sandbox test accounts (fictional, local only): `alice@demo.local` / `demo-alice-2026` and `bob@demo.local` / `demo-bob-2026`. The *Demo scenarios* panel resets and loads a scenario.
 
-Development: `npm run dev:server` and `npm run dev:web` (Vite proxies `/api`).
+## Where every number comes from
 
-## Agent modes (runtime setup)
+| Data | Source | The UI says |
+|---|---|---|
+| Invoice fields | your document, **reviewed and confirmed by you** | "Confirmed by you" |
+| Beneficiary | **a recipient you attested** from an official page (name, account, https address, note). Invoices cannot add or change one. An IBAN-shaped account must pass the mod-97 checksum | "Matched to a recipient you attested" |
+| USD balance and reserve | **declared by you**; the app reads no bank | "declared by you" |
+| Reference FX | National Bank of Kazakhstan RSS (`rates_all.xml`), stored with effective date, retrieval time and body hash | "reference, not an offer" |
+| Wise options | Wise public quote endpoint (unauthenticated). Only currencies and the amount are sent. An option is kept only if this app's own arithmetic reproduces Wise's total to the cent | "Provider API (live)", with rate type and expiry |
+| Other offers | typed by you with a source note and the time you saw it; validity ≤ 7 days; a rate more than 25% from the NBK reference is refused as a probable typo | "Entered by you" |
+| Fee, arrival, rate you did not provide | **unknown**; never replaced by a demo number | absent |
+| Payment status | only your own marks and files | "not verified by a bank" |
 
-- **MOCK** (default): a deterministic stand-in drives the same tools, policies and database as the live adapter. It is labeled MOCK and reports no token usage. It is not a live model run.
-- **LIVE**: copy `.env.example` to `.env` and set `APP_LLM_API_KEY` and `APP_LLM_MODEL` (server-only; `ANTHROPIC_API_KEY` is intentionally never read, so an exported key cannot switch other tools to API billing). Then `npm run smoke:live` for one bounded synthetic task, or the bounded live pack (spends real credits; see `docs/LIVE_RUN.md`). The badge reads `LIVE (unverified)` until a LIVE task with provider-reported usage exists in the database.
+## How money is handled
 
-**LIVE MODE NOT VERIFIED in this repository.** The adapter (official `@anthropic-ai/sdk`, isolated behind an interface) is tested against a local fake provider only. The provider's regional availability may not cover the Shenzhen venue; an organizer-approved provider must be confirmed.
+Money is BigInt minor units (USD cents, KZT tiyn) with integer strings on the wire. `principal = ceil(tuition / rate)`, `total = principal + fixed fee`; the recipient amount is rounded down from the rounded-up principal and the rounding surplus is shown. Only routes that are eligible, unexpired, arrive by the deadline and keep the reserve are ranked; the **server** chooses the best route for your stated objective (the model cannot pick a different one). The proposal is hashed (SHA-256) with its quote source; only you can approve it, and only that exact proposal. **The live mode never moves money**: it issues an instruction (recipient, account, total, rate, fee, validity, steps). A manual "I paid" mark or an uploaded PDF/PNG/JPEG is stored with its hash as *your own evidence*; the app never calls it verification. Real execution through a provider API is **not implemented** (it needs provider access, see `docs/REAL_USER_MODE_SOURCES.md`).
 
 ## Test, evaluate, export
 
 | Command | What it does |
 |---|---|
-| `npm run typecheck` | TypeScript strict check |
-| `npm test` | vitest: money, policy, security services, agent, HTTP, cross-process concurrency, adapter vs fake provider, invoice import |
-| `npm run test:e2e` | Playwright browser flow with system Google Chrome (no browser download) |
-| `npm run eval` | 30 fixed cases, deterministic (MOCK + scripted drivers) → `artifacts/evidence/eval-mock.json` |
-| `APP_EVAL_LIVE=1 npm run eval:live` | optional bounded real-model run of the 5-case pack with token and time ceilings (needs your key; spends credits; see `docs/LIVE_RUN.md`). The exit code is a release gate; `--report-only` is the explicit observational mode |
-| `npm run test:summary` | runs type check + both suites and writes measured totals to `artifacts/evidence/test-summary.json` |
-| `npm run evidence` | exports redacted evidence + the offline REPLAY viewer to `artifacts/evidence/` |
-| `npm run demo:capture` | records the captioned demo video and slide screenshots from the real app |
-| `npm run deck` | builds `docs/deck/index.html` and the PDFs from measured files |
-| `npm run licenses` | writes `docs/DEPENDENCIES.md` |
-| `npm run package` | allowlisted, secret-scanned submission archives in `dist-submission/` |
+| `npm run typecheck` / `npm test` | strict type check; vitest (money, policy, security, agent, live mode with recorded real responses, HTTP, concurrency) |
+| `npm run test:e2e` | Playwright with system Chrome: sandbox flows and the live mode (the model is a **local fake provider**, Wise/NBK off) |
+| `npm run eval` | 30 fixed cases on the **sandbox** (MOCK + scripted drivers) → `artifacts/evidence/eval-mock.json` |
+| `APP_EVAL_LIVE=1 npm run eval:live` | optional bounded real-model run (needs your key; spends credits; see `docs/LIVE_RUN.md`) |
+| `npm run check:sources` | read-only check of the real NBK and Wise sources |
+| `npm run test:summary`, `evidence`, `demo:capture`, `deck`, `licenses`, `package` | measured totals, evidence bundle, demo video, slides, dependency list, submission archive |
 
 ## Documents
 
-`docs/ARCHITECTURE.md` (design and quote algorithm) · `docs/SECURITY.md` (permission tiers, controls, tested attacks, known limits) · `docs/PROJECT_SPEC.md` (contract and open organizer questions) · `docs/DEMO_SCRIPT.md` · `docs/PITCH_QA.md` · `docs/deck/` (slides, speaker notes, PDFs) · `AI_USAGE.md` · `docs/DEPENDENCIES.md` · `SUBMISSION_CHECKLIST.md` · `docs/HANDOFF.md`.
+`docs/ARCHITECTURE.md` · `docs/SECURITY.md` · `docs/PROJECT_SPEC.md` · `docs/REAL_USER_MODE_SOURCES.md` (which official sources and APIs exist) · `docs/LIVE_RUN.md` · `docs/DEMO_SCRIPT.md` · `docs/PITCH_QA.md` · `docs/deck/` · `AI_USAGE.md` · `docs/DEPENDENCIES.md` · `SUBMISSION_CHECKLIST.md` · `docs/HANDOFF.md`.
 
-## What is in the box
+## Known limits (honest)
 
-- **Money:** BigInt minor units (USD cents, KZT tiyn); integer strings on the wire; exact decimal rates. `principal = ceil(tuition / rate)`, `total debit = principal + fixed fee`, recipient amount rounded down from the rounded-up principal; the rounding surplus is shown.
-- **Route policy:** only routes that are eligible, unexpired, arrive by the deadline and leave the reserve intact are ranked; deterministic tie-breaking.
-- **Security:** server sessions, CSRF + Origin checks, owner-scoped records, read/propose/execute tiers, SHA-256 proposal binding, human-only approval, single-transaction execution, idempotency keys, one payment per invoice, redacted audit log.
-- **Decisions enforced by the server:** the best route for the stated objective is chosen by the server (a feasible but costlier quote is rejected), the ranking evidence is part of the hashed proposal, cancellation is terminal, and a recorded payment stays COMPLETED even if the model's explanation fails. Summaries and statuses come from stored records; model prose is shown only if it makes no unsupported claim.
-- **Agent:** bounded tool loop (8 tool calls, 10 model requests, 2 transient retries, token budget); the task pauses at `AWAITING_APPROVAL`; no model-callable approval.
-- **Invoice input:** manual entry, a synthetic example, pasted text and text-based PDFs (no OCR). Extracted fields are a draft; ambiguity is never guessed.
-
-## Known limits
-
-Simulated payments only; one currency pair; no real provider integration; no OCR; English plus one tested Russian instruction; no student interviews yet; live model unverified; no KYC/AML; local-demo security posture (loopback HTTP, documented demo credentials). Open organizer questions (rubric, AI-disclosure, final format, inference provider, registration channel) are listed in `docs/PROJECT_SPEC.md` and `SUBMISSION_CHECKLIST.md`.
+- **LIVE model not verified here** until you run it with your key (`docs/LIVE_RUN.md`); the adapter is tested against a local fake provider only.
+- The app **does not execute real payments** and cannot see your bank; confirmation is your own evidence. No KYC/AML, no settlement, no provider contract.
+- Wise's public quote is indicative: the received KZT amount is not guaranteed (`guaranteedTargetAmount: false`) and the endpoint is documented for Wise partners; check Wise's terms before relying on it. The deadline estimate is Wise's own.
+- One currency pair (USD→KZT), fixed-fee offer model (enter a percentage fee as its USD total); text PDFs only (no OCR); English plus one tested Russian instruction.
+- No student interviews yet; local security posture (loopback HTTP, single process, single SQLite file); the model provider's regional availability at the venue is unconfirmed.
