@@ -1,6 +1,6 @@
 # Running the real model (human-triggered)
 
-The live application needs a real model to plan at all (`APP_LLM_API_KEY`, `APP_LLM_MODEL` in `.env`). Two ways to verify it:
+The live application needs a real model to plan at all (`APP_LLM_PROVIDER`, `APP_LLM_API_KEY`, `APP_LLM_MODEL` in `.env`). Two ways to verify it:
 
 1. **`npm run smoke:live`**: one bounded task through the real model, the real Wise and NBK sources, on an in-memory database with one synthetic student. Prints the provider-reported usage. Your live database is untouched.
 2. **The bounded pack below** (`eval:live`): five cases on the **sandbox** test data with the real model.
@@ -15,9 +15,12 @@ A real run spends money on your provider account. It needs your own key and an e
 
 ```
 cp .env.example .env     # then edit .env
+APP_LLM_PROVIDER=groq    # groq | anthropic (default anthropic)
 APP_LLM_API_KEY=...      # your key; never printed by this project
-APP_LLM_MODEL=...        # the exact model id from your provider's current model list
+APP_LLM_MODEL=openai/gpt-oss-120b   # the exact model id from your provider's current model list
 ```
+
+Groq is reached through its OpenAI-compatible endpoint (`https://api.groq.com/openai/v1/chat/completions`) from the server only. The adapter does full tool calling (definitions, `tool_calls`, argument validation, execution, results back to the model) under the same loop limits. A 429 is retried at most twice and waits for the provider's `retry-after` (up to 30 s; a longer wait, such as a daily quota, fails the task visibly). There is no automatic switch to another provider, a paid API or the MOCK agent. Check your Groq plan's rate limits: a planning task sends the tool definitions with every request, so a small tokens-per-minute limit can slow or stop a run.
 
 `ANTHROPIC_API_KEY` is intentionally never read. If your provider account sits in a region the venue cannot use, resolve that with the organizers first (see `SUBMISSION_CHECKLIST.md`).
 

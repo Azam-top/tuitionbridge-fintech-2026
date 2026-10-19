@@ -145,7 +145,7 @@ export function createRunner(ctx: Ctx, llm: LlmClient, opts: { retryDelayMs?: nu
         if (e instanceof LlmError && e.transient && getTaskById(taskId).retries < cfg.maxTransientRetries) {
           bump(taskId, "retries");
           event(taskId, "retry", { text: `Transient provider error (${e.message}); retrying.` });
-          await new Promise((r) => setTimeout(r, retryDelay));
+          await new Promise((r) => setTimeout(r, Math.max(retryDelay, e.retryAfterMs ?? 0)));
           continue;
         }
         if (e instanceof LlmError) throw new PolicyError("PROVIDER_FAILURE", e.message);

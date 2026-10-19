@@ -1,6 +1,8 @@
 // Server-only configuration. Secrets stay in env and are never serialized to clients or logs.
 
 export type AppMode = "live" | "sandbox";
+/** Model provider adapters. "anthropic" is the default; "unsupported" means APP_LLM_PROVIDER named something else (treated as not configured). */
+export type LlmProvider = "anthropic" | "groq" | "unsupported";
 
 export interface AppConfig {
   host: string;
@@ -16,10 +18,14 @@ export interface AppConfig {
   maxUploadBytes: number;
   taskRateLimitPerMinute: number;
   mutateRateLimitPerMinute: number;
+  llmProvider: LlmProvider;
   llmApiKey: string | null;
   llmModel: string | null;
   /** Optional provider endpoint override; used to point the adapter at a local fake provider in tests. */
   llmBaseUrl: string | null;
+  /** Optional reasoning effort for providers that support it (Groq gpt-oss: low | medium | high). Unset = provider default. */
+  llmReasoningEffort: "low" | "medium" | "high" | null;
+  llmTimeoutMs: number;
   llmMaxOutputTokens: number;
   taskTokenBudget: number;
   maxToolCalls: number;
@@ -39,6 +45,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   };
   const key = env.APP_LLM_API_KEY?.trim();
   const model = env.APP_LLM_MODEL?.trim();
+  const providerRaw = env.APP_LLM_PROVIDER?.trim().toLowerCase();
+  const llmProvider: LlmProvider = !providerRaw || providerRaw === "anthropic" ? "anthropic" : providerRaw === "groq" ? "groq" : "unsupported";
+  const effort = env.APP_LLM_REASONING_EFFORT?.trim().toLowerCase();
   // APP_MODE wins; APP_DEMO_MODE=1 is kept as an alias for sandbox. The default is the real (live) mode.
   const appMode: AppMode = env.APP_MODE === "sandbox" || (env.APP_MODE === undefined && env.APP_DEMO_MODE === "1") ? "sandbox" : "live";
   return {
@@ -51,9 +60,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     nbkRates: env.APP_NBK_RATES !== "0",
     uploadDir: env.APP_UPLOAD_DIR?.trim() || (appMode === "sandbox" ? "data/uploads-sandbox" : "data/uploads"),
     maxUploadBytes: num(env.APP_MAX_UPLOAD_BYTES, 2 * 1024 * 1024),
+    llmProvider,
     llmApiKey: key ? key : null,
     llmModel: model ? model : null,
     llmBaseUrl: env.APP_LLM_BASE_URL?.trim() || null,
+    llmReasoningEffort: effort === "low" || effort === "medium" || effort === "high" ? effort : null,
+    llmTimeoutMs: num(env.APP_LLM_TIMEOUT_MS, 60_000),
     llmMaxOutputTokens: num(env.APP_LLM_MAX_OUTPUT_TOKENS, 8192),
     taskTokenBudget: num(env.APP_TASK_TOKEN_BUDGET, 80000),
     maxToolCalls: num(env.APP_MAX_TOOL_CALLS, 8),
@@ -75,10 +87,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
  */
 export type AgentStatus = "LIVE" | "MOCK" | "NOT_CONFIGURED";
 export function agentStatus(c: AppConfig): AgentStatus {
-  if (c.llmApiKey && c.llmModel) return "LIVE";
+  if (c.llmApiKey && c.llmModel && c.llmProvider !== "unsupported") return "LIVE";
   return c.appMode === "sandbox" ? "MOCK" : "NOT_CONFIGURED";
 }
 /** Kept for callers that only distinguish a real model from the stand-in. */
 export function agentMode(c: AppConfig): "LIVE" | "MOCK" {
-  return c.llmApiKey && c.llmModel ? "LIVE" : "MOCK";
+  return c.llmApiKey && c.llmModel && c.llmProvider !== "unsupported" ? "LIVE" : "MOCK";
 }

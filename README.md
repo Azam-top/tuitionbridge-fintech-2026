@@ -23,7 +23,7 @@ Requires Node ≥ 24 (developed and tested on Node 26.11; Node 24 not run). `bet
 
 ```bash
 npm install
-cp .env.example .env        # then set APP_LLM_API_KEY and APP_LLM_MODEL (yours; never commit .env)
+cp .env.example .env        # then set APP_LLM_PROVIDER, APP_LLM_API_KEY and APP_LLM_MODEL (yours; never commit .env)
 npm run build
 npm run start               # LIVE mode on http://127.0.0.1:8787 (loopback only)
 npm run start:sandbox       # SANDBOX test data; no key needed

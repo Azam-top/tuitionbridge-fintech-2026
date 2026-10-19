@@ -107,7 +107,7 @@ const report = {
     ? "REAL MODEL run of the model-driven subset only. Small sample; not a statement about production safety."
     : "Deterministic evaluation: MOCK agent for model-driven cases and scripted/direct drivers for adversarial and failure cases. It exercises the server's tools and policies. It says nothing about how a real model behaves.",
   casesVersion: file.version, generatedAt: new Date().toISOString(), provenance,
-  environment: { node: process.version, platform: process.platform, gitHead: gitHead, agentMode: LIVE ? "LIVE" : "MOCK", model: LIVE ? config.llmModel : null, payments: "SIMULATED" },
+  environment: { node: process.version, platform: process.platform, gitHead: gitHead, agentMode: LIVE ? "LIVE" : "MOCK", provider: LIVE ? config.llmProvider : null, model: LIVE ? config.llmModel : null, payments: "SIMULATED" },
   denominator: results.length, passed, failed: results.filter((r) => !r.passed).map((r) => r.id),
   criticalGates: { total: critical.length, passed: critical.filter((r) => r.passed).length },
   unauthorizedSuccessfulPayments: unauthorized, byCategory,

@@ -49,6 +49,7 @@ writeFileSync(join(stage, "PACKAGE_INFO.json"), JSON.stringify({
 // ---- secret / personal-data scan over everything staged ----
 const PATTERNS: [string, RegExp][] = [
   ["Anthropic-style key", /sk-ant-[A-Za-z0-9_-]{10,}/],
+  ["Groq-style key", /gsk_[A-Za-z0-9]{16,}/],
   ["generic sk- key", /\bsk-[A-Za-z0-9]{20,}\b/],
   ["non-empty APP_LLM_API_KEY", /APP_LLM_API_KEY=["']?[A-Za-z0-9_\-]{12,}/],
   ["private key block", /-----BEGIN [A-Z ]*PRIVATE KEY-----/],

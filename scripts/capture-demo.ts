@@ -38,7 +38,7 @@ const LIVE_PORT = 8802;
 const LIVE_BASE = `http://127.0.0.1:${LIVE_PORT}`;
 const liveConfig = loadConfig({
   APP_MODE: "live", APP_PORT: String(LIVE_PORT), APP_LOGIN_RATE_LIMIT: "1000", APP_WISE_QUOTES: "1", APP_NBK_RATES: "1",
-  APP_LLM_API_KEY: "fake-key-local-provider", APP_LLM_MODEL: "fake-model", APP_LLM_BASE_URL: "http://127.0.0.1:8797", APP_UPLOAD_DIR: "artifacts/tmp/live-uploads",
+  APP_LLM_API_KEY: "fake-key-local-provider", APP_LLM_MODEL: "fake-model", APP_LLM_PROVIDER: "anthropic", APP_LLM_BASE_URL: "http://127.0.0.1:8797", APP_UPLOAD_DIR: "artifacts/tmp/live-uploads",
 });
 const liveCtx = { db: openDb(":memory:", "live"), clock: systemClock, config: liveConfig };
 const liveLlm = createLlm(liveConfig);

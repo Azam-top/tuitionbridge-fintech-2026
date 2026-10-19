@@ -91,7 +91,7 @@ describe("fake-provider report cannot become a deck claim", () => {
     const dir = mkdtempSync(join(tmpdir(), "tb-fakeprov-"));
     const r = spawnSync(node, ["--import", "tsx", "scripts/eval/run.ts", "--live", "--max-cases=1", "--report-only"], {
       encoding: "utf8",
-      env: { ...process.env, APP_EVAL_LIVE: "1", APP_LLM_API_KEY: "fake-key-for-test", APP_LLM_MODEL: "fake-model", APP_LLM_BASE_URL: "http://127.0.0.1:1", APP_EVAL_OUT_DIR: dir },
+      env: { ...process.env, APP_EVAL_LIVE: "1", APP_LLM_API_KEY: "fake-key-for-test", APP_LLM_MODEL: "fake-model", APP_LLM_PROVIDER: "anthropic", APP_LLM_BASE_URL: "http://127.0.0.1:1", APP_EVAL_OUT_DIR: dir },
     });
     expect(r.status).toBe(0);
     const report = JSON.parse(readFileSync(join(dir, "eval-live.json"), "utf8"));

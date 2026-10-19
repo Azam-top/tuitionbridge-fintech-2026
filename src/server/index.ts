@@ -33,5 +33,7 @@ await app.listen({ host: config.host, port: config.port });
 const agent = agentStatus(config);
 console.log(`TuitionBridge on http://${config.host}:${config.port}  mode=${config.appMode.toUpperCase()}  agent=${agent}  db=${config.dbPath}`);
 if (config.appMode === "sandbox") console.log("SANDBOX: test data only; payments are SIMULATED. This is not the real application mode.");
-if (agent === "NOT_CONFIGURED") console.log("SETUP REQUIRED: set APP_LLM_API_KEY and APP_LLM_MODEL in .env. The live mode has no stand-in agent.");
+if (config.llmProvider === "unsupported") console.log("SETUP REQUIRED: APP_LLM_PROVIDER must be \"anthropic\" or \"groq\".");
+else if (agent === "NOT_CONFIGURED") console.log("SETUP REQUIRED: set APP_LLM_PROVIDER, APP_LLM_API_KEY and APP_LLM_MODEL in .env. The live mode has no stand-in agent.");
+else if (agent === "LIVE") console.log(`Model provider: ${config.llmProvider}, model: ${config.llmModel}.`);
 if (agent === "MOCK") console.log("Sandbox agent is the deterministic MOCK stand-in (not a live model).");

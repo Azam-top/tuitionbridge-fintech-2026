@@ -62,7 +62,7 @@ describe("live pack against a local fake provider", () => {
   it("records reported usage, enforces the total token ceiling, and cannot pass the release gate", async () => {
     const url = await fakeProvider(() => ({ status: 200, json: { id: "msg_1", type: "message", role: "assistant", model: "fake", content: [{ type: "text", text: "I have nothing to do." }], stop_reason: "end_turn", stop_sequence: null, usage: { input_tokens: 1500, output_tokens: 500 } } }));
     const dir = mkdtempSync(join(tmpdir(), "tb-pack-"));
-    const r = await runEval(["--live", "--max-total-tokens=1000"], { APP_EVAL_LIVE: "1", APP_LLM_API_KEY: "fake-key-for-test", APP_LLM_MODEL: "fake-model", APP_LLM_BASE_URL: url, APP_EVAL_OUT_DIR: dir });
+    const r = await runEval(["--live", "--max-total-tokens=1000"], { APP_EVAL_LIVE: "1", APP_LLM_API_KEY: "fake-key-for-test", APP_LLM_MODEL: "fake-model", APP_LLM_PROVIDER: "anthropic", APP_LLM_BASE_URL: url, APP_EVAL_OUT_DIR: dir });
     expect(r.code).toBe(1);
     const rep = JSON.parse(readFileSync(join(dir, "eval-live.json"), "utf8"));
     expect(rep.provenance).toMatchObject({ driver: "live-adapter", endpoint: "custom-override" });
@@ -76,7 +76,7 @@ describe("live pack against a local fake provider", () => {
   it("cases that need no model still pass, while model-dependent ones fail when the provider rejects everything", async () => {
     const url = await fakeProvider(() => ({ status: 400, json: { type: "error", error: { type: "invalid_request_error", message: "nope" } } }));
     const dir = mkdtempSync(join(tmpdir(), "tb-pack-"));
-    const r = await runEval(["--live"], { APP_EVAL_LIVE: "1", APP_LLM_API_KEY: "fake-key-for-test", APP_LLM_MODEL: "fake-model", APP_LLM_BASE_URL: url, APP_EVAL_OUT_DIR: dir });
+    const r = await runEval(["--live"], { APP_EVAL_LIVE: "1", APP_LLM_API_KEY: "fake-key-for-test", APP_LLM_MODEL: "fake-model", APP_LLM_PROVIDER: "anthropic", APP_LLM_BASE_URL: url, APP_EVAL_OUT_DIR: dir });
     expect(r.code).toBe(1);
     const rep = JSON.parse(readFileSync(join(dir, "eval-live.json"), "utf8"));
     const passed = rep.cases.filter((c: { passed: boolean }) => c.passed).map((c: { id: string }) => c.id).sort();

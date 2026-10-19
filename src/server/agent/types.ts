@@ -52,7 +52,7 @@ export interface LlmClient {
 
 /** Thrown by adapters. `transient` errors may be retried (bounded by the runner). */
 export class LlmError extends Error {
-  constructor(message: string, public readonly transient: boolean, public readonly status?: number) {
+  constructor(message: string, public readonly transient: boolean, public readonly status?: number, public readonly retryAfterMs?: number) {
     super(message);
     this.name = "LlmError";
   }

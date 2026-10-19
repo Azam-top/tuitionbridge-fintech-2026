@@ -64,7 +64,7 @@ describe("evaluation runner exit status (fake provider, no spend)", () => {
   it("live cases that fail make the command fail, and the full result is still written", async () => {
     const url = await fakeProvider();
     const dir = mkdtempSync(join(tmpdir(), "tb-eval-"));
-    const env = { APP_EVAL_LIVE: "1", APP_LLM_API_KEY: "fake-key-for-test", APP_LLM_MODEL: "fake-model", APP_LLM_BASE_URL: url, APP_EVAL_OUT_DIR: dir };
+    const env = { APP_EVAL_LIVE: "1", APP_LLM_API_KEY: "fake-key-for-test", APP_LLM_MODEL: "fake-model", APP_LLM_PROVIDER: "anthropic", APP_LLM_BASE_URL: url, APP_EVAL_OUT_DIR: dir };
     const r = await runEval(["--live", "--max-cases=2"], env);
     expect(r.code).toBe(1);
     const report = JSON.parse(readFileSync(join(dir, "eval-live.json"), "utf8"));
@@ -82,7 +82,7 @@ describe("evaluation runner exit status (fake provider, no spend)", () => {
   it("an invalid sample size is rejected before anything runs", async () => {
     const dir = mkdtempSync(join(tmpdir(), "tb-eval-"));
     for (const bad of ["0", "abc", "100"]) {
-      const r = await runEval(["--live", `--max-cases=${bad}`], { APP_EVAL_LIVE: "1", APP_LLM_API_KEY: "fake-key-for-test", APP_LLM_MODEL: "fake-model", APP_LLM_BASE_URL: "http://127.0.0.1:1", APP_EVAL_OUT_DIR: dir });
+      const r = await runEval(["--live", `--max-cases=${bad}`], { APP_EVAL_LIVE: "1", APP_LLM_API_KEY: "fake-key-for-test", APP_LLM_MODEL: "fake-model", APP_LLM_PROVIDER: "anthropic", APP_LLM_BASE_URL: "http://127.0.0.1:1", APP_EVAL_OUT_DIR: dir });
       expect(r.code, bad).toBe(2);
       expect(r.out).toMatch(/max-cases/);
     }

@@ -49,7 +49,7 @@ interface ReportLike {
   generatedAt?: string;
   denominator?: number;
   passed?: number;
-  environment?: { agentMode?: string; model?: string | null };
+  environment?: { agentMode?: string; provider?: string | null; model?: string | null };
   usage?: { tokensReported?: boolean; totalInputTokens?: number; totalOutputTokens?: number };
   gate?: { mode?: string; ok?: boolean };
   provenance?: Partial<Provenance>;

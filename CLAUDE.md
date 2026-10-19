@@ -8,7 +8,7 @@ Two modes: LIVE (default; real accounts and sources; a real model is required; t
 - `npm run typecheck` | `npm test` (vitest) | `npm run build` | `npm run test:e2e` (playwright, uses system Chrome).
 - `npm run reset-demo` resets the demo dataset (local demo only).
 - Session 2 tooling: `npm run eval` (30 fixed cases, eval/cases.json), `evidence`, `deck`, `demo:capture`, `test:summary`, `licenses`, `package`; live-only: `smoke:live`, `eval:live` (spend credits; never run without the user's explicit key).
-- Config via env (server only): APP_LLM_API_KEY, APP_LLM_MODEL, APP_PORT, APP_DB_PATH, APP_DEMO_MODE; rate limits APP_LOGIN_RATE_LIMIT / APP_TASK_RATE_LIMIT / APP_MUTATE_RATE_LIMIT; APP_LLM_BASE_URL only for local fake providers in tests. No key => MOCK agent. Never print secrets. Do not read ANTHROPIC_API_KEY (keeps Claude Code billing separate).
+- Config via env (server only): APP_LLM_PROVIDER (anthropic|groq), APP_LLM_API_KEY, APP_LLM_MODEL (optional APP_LLM_REASONING_EFFORT, APP_LLM_TIMEOUT_MS), APP_PORT, APP_DB_PATH, APP_DEMO_MODE; rate limits APP_LOGIN_RATE_LIMIT / APP_TASK_RATE_LIMIT / APP_MUTATE_RATE_LIMIT; APP_LLM_BASE_URL only for local fake providers in tests. No key => MOCK agent. Never print secrets. Do not read ANTHROPIC_API_KEY (keeps Claude Code billing separate).
 
 ## Layout
 - src/shared: money.ts (BigInt math), policy.ts (route eval/ranking), canonical.ts, intent.ts (EN/RU parser), schemas.
