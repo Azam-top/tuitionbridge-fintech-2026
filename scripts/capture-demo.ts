@@ -157,6 +157,19 @@ if (outcome === "problem") {
 await page.getByTestId("approval-card").scrollIntoViewIfNeeded();
 await caption(page, "The exact proposal: recipient, amounts, reserve kept, and where this offer came from. The server chose the best route, not the model");
 await pause(8000);
+// Stills for the presentation: the live approval card and the top of the live workspace (no caption bar, no sticky review bar).
+await shot(page, "#approval", `${IMG}/live-approval.png`);
+await page.evaluate(() => {
+  const c = document.getElementById("demo-caption"); if (c) c.style.display = "none";
+  const r = document.querySelector<HTMLElement>(".review-bar"); if (r) r.style.display = "none";
+  document.querySelector(".workspace")?.scrollIntoView({ block: "start" }); window.scrollBy(0, -12);
+});
+await pause(500);
+await page.screenshot({ path: `${IMG}/live-plan.png` });
+await page.evaluate(() => {
+  const c = document.getElementById("demo-caption"); if (c) c.style.display = "";
+  const r = document.querySelector<HTMLElement>(".review-bar"); if (r) r.style.display = "";
+});
 await page.getByTestId("approve-btn").click();
 await page.getByTestId("instruction-card").waitFor({ timeout: 20_000 });
 await page.getByTestId("instruction-card").scrollIntoViewIfNeeded();

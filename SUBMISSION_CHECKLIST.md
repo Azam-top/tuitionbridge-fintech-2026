@@ -11,7 +11,7 @@ Deadline: **20 Oct 2026, 23:59 Beijing = 20:59 Almaty**. Recommended: submit on 
 | Security assessment | Done (self-assessment, not an audit) | `docs/SECURITY.md` |
 | Sandbox logs / evidence | Done (sandbox: MOCK agent, SIMULATED payments, redacted) | `artifacts/evidence/` (open `viewer.html`) |
 | Evaluation (30 cases) | Done: deterministic, on the **sandbox** test data | `eval/cases.json`, `artifacts/evidence/eval-mock.json` |
-| Pitch deck + speaker notes | Done | `docs/deck/index.html`, `docs/deck/TuitionBridge_pitch.pdf`, `..._with_notes.pdf` |
+| Presentation (10 slides, 16:9, about 9 minutes) | Done | PDF for submission: `docs/deck/TuitionBridge_Presentation.pdf` (also copied next to the archives in `dist-submission/`). Editable source: `docs/deck/index.html` with `docs/deck/img/` (built by `npm run deck`). Speaker notes: `docs/deck/TuitionBridge_Speaker_Notes.md`. Russian summary for the presenter: `docs/deck/TuitionBridge_Project_Summary_RU.md` |
 | Judge Q&A, demo script | Done | `docs/PITCH_QA.md`, `docs/DEMO_SCRIPT.md` |
 | Demo video (≤5 min) | **Exists, with caveats**: re-recorded 2026-10-18; LIVE segment uses a LOCAL FAKE model provider (captioned) and the real NBK/Wise sources; SANDBOX segment; MOCK/fake model, captions only, no narration | `artifacts/demo/tuitionbridge-demo-mock.mp4` |
 | AI usage statement | Draft: **HUMAN must complete the review section** | `AI_USAGE.md` |
@@ -25,9 +25,9 @@ Measured at packaging time: see `artifacts/evidence/test-summary.json` (type che
 1a. **Real payment execution: NOT IMPLEMENTED.** The live mode issues an instruction and stores your own evidence; it needs confirmed provider access (e.g. a verified Wise business account and API token) before the app can create transfers.
 1b. **Your real data: NOT DONE with a real model.** Declare your funds, add your university's official payment details as a trusted recipient, enter your real invoice, check the extracted fields, review the live Wise offers, approve the plan yourself, then pay at the provider's own site following the instruction. The browser flow is tested only with a local fake model.
 2. **Real-model evaluation: NOT DONE** (the smoke test above is one run, not this evaluation; `artifacts/evidence/eval-live.json` does not exist). Run: `APP_EVAL_LIVE=1 npm run eval:live` (five-case pack, token/time ceilings). Report it separately from the deterministic results; failures are reported as failures.
-3. **Student evidence: NOT COLLECTED.** 5–10 consented, anonymized interviews; replace the TODOs on deck slides 2 and 10 with real counts. No banking or passport documents in the repository.
+3. **Student evidence: NOT COLLECTED.** 5–10 consented, anonymized interviews; the presentation says plainly that no interviews have been run; update slides 2 and 10 only after they are done. No banking or passport documents in the repository.
 4. **Human code review: NOT RECORDED.** The money algorithm, approval gate, tool loop and ledger transaction must be read and understood by the team; fill in `AI_USAGE.md`.
-5. **Narrated demo / rehearsal: NOT DONE.** The recording has captions only. Rehearse the spoken script in `docs/DEMO_SCRIPT.md` aloud with timing (≤5 min; deck ≤10 min).
+5. **Narrated demo / rehearsal: NOT DONE.** The recording has captions only. Rehearse the spoken script in `docs/DEMO_SCRIPT.md` aloud with timing (video ≤5 min; presentation about 9 minutes).
 6. **Fresh-machine install test: NOT DONE on a teammate's machine.** Verified locally from an extracted package (see HANDOFF). Node 24 LTS was never run (developed on Node 26).
 7. **Project license:** not chosen.
 

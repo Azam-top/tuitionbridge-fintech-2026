@@ -83,3 +83,9 @@ const mb = (p: string) => (statSync(p).size / 1e6).toFixed(2);
 console.log(`Packaged ${files.length} files. Secret scan: clean.`);
 console.log(`  ${tgz} (${mb(tgz)} MB)\n  ${zip} (${mb(zip)} MB)\n  dist-submission/CONTENTS.txt`);
 if (missing.length) console.log(`NOT FOUND (skipped): ${missing.join(", ")}`);
+
+// The presentation is also handed over as one separate file next to the archives.
+if (existsSync("docs/deck/TuitionBridge_Presentation.pdf")) {
+  cpSync("docs/deck/TuitionBridge_Presentation.pdf", "dist-submission/TuitionBridge_Presentation.pdf");
+  console.log("  dist-submission/TuitionBridge_Presentation.pdf (separate file for submission)");
+}
