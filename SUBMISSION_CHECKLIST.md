@@ -14,7 +14,7 @@ Deadline: **20 Oct 2026, 23:59 Beijing = 20:59 Almaty**. Recommended: submit on 
 | Presentation (10 slides, 16:9, about 9 minutes) | Done | PDF for submission: `docs/deck/TuitionBridge_Presentation.pdf` (also copied next to the archives in `dist-submission/`). Editable source: `docs/deck/index.html` with `docs/deck/img/` (built by `npm run deck`). Speaker notes: `docs/deck/TuitionBridge_Speaker_Notes.md`. Russian summary for the presenter: `docs/deck/TuitionBridge_Project_Summary_RU.md` |
 | Judge Q&A, demo script | Done | `docs/PITCH_QA.md`, `docs/DEMO_SCRIPT.md` |
 | Demo video (about 3 minutes) | **Exists, with caveats**: the LIVE segment uses a LOCAL FAKE model provider (captioned) and the real NBK/Wise sources; then the SANDBOX segment with the MOCK agent; captions only, no narration | `artifacts/demo/TuitionBridge_Demo.mp4` (also copied next to the ZIP) |
-| AI usage statement | Draft: **HUMAN must complete the review section** | `AI_USAGE.md` |
+| AI usage statement | Done, with the status stated: roles are separated and a full human code review is **not documented** | `AI_USAGE.md` |
 | Dependency licenses | Done | `docs/DEPENDENCIES.md` |
 | Repository URL | Done (public) | <https://github.com/Azam-top/tuitionbridge-fintech-2026> |
 
@@ -26,7 +26,7 @@ Measured at packaging time: see `artifacts/evidence/test-summary.json` (type che
 1b. **Your real data: NOT DONE with a real model.** Declare your funds, add your university's official payment details as a trusted recipient, enter your real invoice, check the extracted fields, review the live Wise offers, approve the plan yourself, then pay at the provider's own site following the instruction. The browser flow is tested only with a local fake model.
 2. **Real-model evaluation: NOT DONE** (the smoke test above is one run, not this evaluation; `artifacts/evidence/eval-live.json` does not exist). Run: `APP_EVAL_LIVE=1 npm run eval:live` (five-case pack, token/time ceilings). Report it separately from the deterministic results; failures are reported as failures.
 3. **Student evidence: NOT COLLECTED.** 5–10 consented, anonymized interviews; the presentation says plainly that no interviews have been run; update slides 2 and 10 only after they are done. No banking or passport documents in the repository.
-4. **Human code review: NOT RECORDED.** The money algorithm, approval gate, tool loop and ledger transaction must be read and understood by the team; fill in `AI_USAGE.md`.
+4. **Human code review: NOT RECORDED.** The money algorithm, approval gate, tool loop and ledger transaction should be read and understood by the team. `AI_USAGE.md` states that no full review is documented; update it only after a person has actually reviewed the code.
 5. **Narrated demo / rehearsal: NOT DONE.** The recording has captions only. Rehearse the spoken script in `docs/DEMO_SCRIPT.md` aloud with timing (video ≤5 min; presentation about 9 minutes).
 6. **Fresh-machine install test: NOT DONE on a teammate's machine.** Verified locally from an extracted package (see HANDOFF). Node 24 LTS was never run (developed on Node 26).
 7. **Project license:** not chosen.

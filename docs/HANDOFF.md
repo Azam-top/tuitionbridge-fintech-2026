@@ -38,7 +38,7 @@ From `artifacts/evidence/test-summary.json`, `eval-mock.json`, `manifest.json`, 
 - **Full real-model verification: not done.** The five-case pack needs your decision to spend tokens: `APP_EVAL_LIVE=1 npm run eval:live` (see `docs/LIVE_RUN.md`). A manual browser pass with your real invoice is also open. The in-app "Go to the provider" step is text only: the instruction card tells you to open Wise (or the channel that gave the offer) yourself; there is no link or redirect.
 - **Real payment execution through a provider: not implemented.** Wise's documentation says a personal API token belongs to a Wise business account and exposes a subset of the API; whether it can create and fund USD→KZT transfers is unverified. Until access is confirmed the live mode issues an instruction and accepts user evidence. A manual mark or uploaded file is never called bank confirmation.
 - Wise's public quote is indicative (`guaranteedTargetAmount: false`) and its endpoint is documented for Wise affiliate partners; read Wise's terms before relying on it (`APP_WISE_QUOTES=0` switches it off).
-- No student interviews; human review section of `AI_USAGE.md` blank; no narrated rehearsal; Node 24 not run; organizer questions open (see SUBMISSION_CHECKLIST.md).
+- No student interviews; no full human code review documented (`AI_USAGE.md` says so); no narrated rehearsal; Node 24 not run; organizer questions open (see SUBMISSION_CHECKLIST.md).
 
 ## Commands
 `npm run build && npm run start` (live) · `npm run start:sandbox` · `npm run check:sources` · `npm run typecheck|test|test:e2e|eval|evidence|demo:capture|deck|licenses|package|test:summary` · `npm run smoke:live` (your key; spends credits; provider from `APP_LLM_PROVIDER`).
