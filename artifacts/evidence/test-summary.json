@@ -1,14 +1,14 @@
 {
-  "generatedAt": "2026-10-20T11:44:56.718Z",
+  "generatedAt": "2026-10-20T13:59:17.835Z",
   "node": "v26.11.1",
   "projectVersion": "0.1.0",
-  "sourceCommit": "bb99c9eac52fb2654fe6641e3baa1b265bff24d6",
+  "sourceCommit": "f7f4762bf695fa18ee908d955a0486241ad5b9cc",
   "sourceDirty": false,
   "typecheck": "pass",
   "unitAndIntegration": {
-    "files": 17,
-    "total": 210,
-    "passed": 210,
+    "files": 18,
+    "total": 231,
+    "passed": 231,
     "failed": 0
   },
   "browser": {

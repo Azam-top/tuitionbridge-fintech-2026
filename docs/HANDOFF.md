@@ -3,9 +3,9 @@
 ## State
 The app now has two separate modes. **LIVE** (default): real accounts, your own invoice, a real model is required (no stand-in; `APP_LLM_PROVIDER=groq` or `anthropic`, no automatic fallback to another provider or the MOCK agent), payment options only from named sources (Wise public quote API, offers you type with source and time, NBK reference rate), and the app **moves no money**: it issues a payment instruction and stores your own evidence. **SANDBOX**: a separate stamped database of fictional TEST DATA with the MOCK agent and a SIMULATED ledger, used for the competition check and the 30 evaluation cases. See README for the table.
 
-## Measured results (source commit `bb99c9eac52fb2654fe6641e3baa1b265bff24d6`, clean tree, Node v26.11.1)
+## Measured results (source commit `f7f4762bf695fa18ee908d955a0486241ad5b9cc`, clean tree, Node v26.11.1)
 From `artifacts/evidence/test-summary.json`, `eval-mock.json`, `manifest.json`, all at that one source commit (regenerated 2026-10-20 on the clean tree; the later commit adds artifacts and docs only, and `npm run package` refuses unless the artifacts share one clean source commit and sources did not change since). The source commit adds, on top of the dark redesign (`d47c1e1`) and the Groq adapter (`b4e1ecd`), the ordinary-user planning flow (see "Ordinary-user flow" below).
-- Type check pass; unit/integration **210/210** (17 files); browser **30/30** (21 sandbox + 9 live, the live ones with a LOCAL FAKE model); production build pass.
+- Type check pass; unit/integration **231/231** (18 files); browser **30/30** (21 sandbox + 9 live, the live ones with a LOCAL FAKE model); production build pass.
 - Deterministic evaluation on the **sandbox**: **30/30**, critical **12/12**, unauthorized payments **0**, gate PASS (MOCK + scripted drivers; says nothing about a real model).
 - Demo video re-recorded at the same source commit on the new interface (2 min 44 s, captions only; in the live segment the server fetched real Wise quotes by itself when "Plan my payment" was pressed): LIVE segment with the local fake model and the real NBK/Wise sources, then the sandbox. Deck (with PDFs), screenshots, evidence viewer and `docs/DEPENDENCIES.md` regenerated. The video and deck still say the real-model *evaluation* is not run, which is true.
 - **Real-model smoke, two runs, one script each, no payment, synthetic student (see `docs/LIVE_SMOKE_RESULT.md`):**
@@ -14,12 +14,17 @@ From `artifacts/evidence/test-summary.json`, `eval-mock.json`, `manifest.json`, 
   - So: no real-model run has passed on the packaged sources, and the new system prompt has not been exercised through a proposal.
 - **Not confirmed by that run:** the five-case live evaluation (`eval:live`, no `eval-live.json`), and a manual pass in the browser with a real invoice and a real model. **The LIVE mode is not fully verified.**
 
-## Ordinary-user flow (changed 2026-10-20)
+## Changes since the smoke runs (2026-10-20)
+1. **Wise amounts (`f94f3a0`):** each Wise option stores Wise's own total, fee and recipient amount as exact minor units and every later step uses them (no rebuild from the rounded rate, no tolerance). Verified without a model: a regression on the rounding case, exact-conversion, hash-binding, tamper and exclusion tests, and one fresh real Wise response taken through the whole path (`npm run check:sources`). This is the fix for smoke run 2.
+2. **Final interface copy pass (`f7f4762`):** plain wording on the main screens, compact Wise offer cards, one recommendation with a concrete reason, sources and technical origin in closed Details, "Continue on Wise" with "Complete your payment on Wise". Screens: `docs/ui-screens/`.
+3. **Still true:** no real-model run has passed on these sources; the manual pass with a real invoice is not done (`docs/MANUAL_PASS.md`); the five-case live evaluation was not run; the LIVE mode is not fully verified.
+
+## Ordinary-user flow (changed 2026-10-20; wording refined by the copy pass)
 - The live screens show no mode/agent badges, model name or token counters; mode, model and run limits sit in the collapsed "Technical details" section (the sandbox keeps its labels). "Setup required" stays visible when no model is configured.
 - "Plan my payment": the server fetches current Wise quotes (and the NBK reference) before the assistant runs; manual bank offers are optional. With Wise switched off and no offer the planner says so and does not start.
 - One effective reserve: the plan's own (what the server read), otherwise a preview of the settings next to the button. The saved default is shown separately and only as "Saved default".
-- Failures (model, Wise, safety limit) show a reason, "Nothing was paid" and Try again (and "enter an offer" for Wise problems). No MOCK fallback in the live mode.
-- "Go to Wise" opens the fixed address `https://wise.com/` (a constant) next to "Finish the payment on Wise", only for an instruction built from a Wise quote.
+- Failures (model, Wise, safety limit) show a plain reason and Try again (and "Add an offer from your bank" for Wise problems). No MOCK fallback in the live mode.
+- "Continue on Wise" opens the fixed address `https://wise.com/` (a constant) next to "Complete your payment on Wise", only for an unexpired instruction built from a Wise quote. The instruction says "Not paid yet"; a user's mark or attached file is shown as "not confirmed by a bank".
 - Screens: `docs/ui-screens/05-13`. Not verified with a real model: this whole flow ran only with the local fake model (and real Wise in the recording).
 
 ## What is real and verified
