@@ -1,7 +1,7 @@
 {
   "description": "Completed payment: tool trace, human approval record, ledger before/after, receipt.",
   "task": {
-    "id": "task_0b6c5b6fa6fa49cfb2e7",
+    "id": "task_f1044dffdea14573845a",
     "state": "COMPLETED",
     "mode": "MOCK",
     "model": null,
@@ -21,7 +21,7 @@
       "latencyMs": 1,
       "tokensReported": false
     },
-    "summary": "Payment completed in the SIMULATED ledger (pay_712c9fdbb0ee44639301): USD 1,010.00 debited through SteadyPay (simulated), KZT 500,000.00 credited to the university account. This is a sandbox record, not a bank transfer.",
+    "summary": "Payment completed in the SIMULATED ledger (pay_89864df664244dd28d56): USD 1,010.00 debited through SteadyPay (simulated), KZT 500,000.00 credited to the university account. This is a sandbox record, not a bank transfer.",
     "error": null
   },
   "toolTrace": [
@@ -31,7 +31,7 @@
       "tool": null,
       "ok": null,
       "text": "RUNNING (MOCK agent; payments are SIMULATED)",
-      "at": "2026-10-18T13:23:02.202Z",
+      "at": "2026-10-20T10:50:18.359Z",
       "input": null,
       "output": null
     },
@@ -41,7 +41,7 @@
       "tool": null,
       "ok": null,
       "text": "I will read the confirmed invoice and balances, then request simulated quotes.",
-      "at": "2026-10-18T13:23:02.209Z",
+      "at": "2026-10-20T10:50:18.363Z",
       "input": null,
       "output": null
     },
@@ -51,7 +51,7 @@
       "tool": "parse_invoice",
       "ok": true,
       "text": null,
-      "at": "2026-10-18T13:23:02.212Z",
+      "at": "2026-10-20T10:50:18.366Z",
       "input": {},
       "output": {
         "reference": "INV-2026-0417",
@@ -60,7 +60,7 @@
         "beneficiaryAccount": "KZ00SANDBOX0000000001",
         "amountKztTiyn": "50000000",
         "amountFormatted": "KZT 500,000.00",
-        "deadlineAt": "2026-10-20T13:23:02.016Z",
+        "deadlineAt": "2026-10-22T10:50:18.238Z",
         "sourceType": "synthetic_example",
         "registryCheck": "MATCHES_TRUSTED_REGISTRY",
         "untrustedNotes": "Autumn semester tuition (synthetic example).",
@@ -73,7 +73,7 @@
       "tool": "get_balances",
       "ok": true,
       "text": null,
-      "at": "2026-10-18T13:23:02.213Z",
+      "at": "2026-10-20T10:50:18.367Z",
       "input": {},
       "output": {
         "usd": {
@@ -99,39 +99,39 @@
       "tool": "get_quotes",
       "ok": true,
       "text": null,
-      "at": "2026-10-18T13:23:02.215Z",
+      "at": "2026-10-20T10:50:18.368Z",
       "input": {},
       "output": {
         "quotes": [
           {
-            "quoteId": "q_45bc9febf77a4dbfa42d",
+            "quoteId": "q_e32191420c2e44ddb25f",
             "provider": "FastLane Remit (simulated)",
             "rate": "495",
             "feeCents": "1500",
-            "estArrivalAt": "2026-10-18T19:23:02.214Z",
-            "expiresAt": "2026-10-18T13:38:02.214Z",
+            "estArrivalAt": "2026-10-20T16:50:18.368Z",
+            "expiresAt": "2026-10-20T11:05:18.368Z",
             "source": "SIMULATED",
             "sourceNote": null,
             "observedAt": null
           },
           {
-            "quoteId": "q_c907e58b504645c6bc06",
+            "quoteId": "q_ac2f9c5641d841959608",
             "provider": "BudgetBridge (simulated)",
             "rate": "505",
             "feeCents": "500",
-            "estArrivalAt": "2026-10-21T13:23:02.214Z",
-            "expiresAt": "2026-10-18T13:38:02.214Z",
+            "estArrivalAt": "2026-10-23T10:50:18.368Z",
+            "expiresAt": "2026-10-20T11:05:18.368Z",
             "source": "SIMULATED",
             "sourceNote": null,
             "observedAt": null
           },
           {
-            "quoteId": "q_ad790ba43ff548ccb6e9",
+            "quoteId": "q_8298b6345f034a769e5f",
             "provider": "SteadyPay (simulated)",
             "rate": "500",
             "feeCents": "1000",
-            "estArrivalAt": "2026-10-19T13:23:02.214Z",
-            "expiresAt": "2026-10-18T13:38:02.214Z",
+            "estArrivalAt": "2026-10-21T10:50:18.368Z",
+            "expiresAt": "2026-10-20T11:05:18.368Z",
             "source": "SIMULATED",
             "sourceNote": null,
             "observedAt": null
@@ -145,7 +145,7 @@
       "tool": null,
       "ok": null,
       "text": "Ranking the routes for the cheapest preference while keeping the reserve.",
-      "at": "2026-10-18T13:23:02.216Z",
+      "at": "2026-10-20T10:50:18.369Z",
       "input": null,
       "output": null
     },
@@ -155,7 +155,7 @@
       "tool": "evaluate_routes",
       "ok": true,
       "text": null,
-      "at": "2026-10-18T13:23:02.220Z",
+      "at": "2026-10-20T10:50:18.372Z",
       "input": {
         "preference": "cheapest",
         "reserve_usd_cents": "30000"
@@ -163,11 +163,11 @@
       "output": {
         "preference": "cheapest",
         "reserveUsdCents": "30000",
-        "bestQuoteId": "q_ad790ba43ff548ccb6e9",
+        "bestQuoteId": "q_8298b6345f034a769e5f",
         "noFeasibleRoute": false,
         "routes": [
           {
-            "quoteId": "q_ad790ba43ff548ccb6e9",
+            "quoteId": "q_8298b6345f034a769e5f",
             "provider": "SteadyPay (simulated)",
             "feasible": true,
             "rate": "500",
@@ -179,12 +179,12 @@
             "recipientWillReceive": "KZT 500,000.00",
             "roundingSurplus": "KZT 0.00",
             "usdAfterPayment": "USD 490.00",
-            "estArrivalAt": "2026-10-19T13:23:02.214Z",
-            "expiresAt": "2026-10-18T13:38:02.214Z",
+            "estArrivalAt": "2026-10-21T10:50:18.368Z",
+            "expiresAt": "2026-10-20T11:05:18.368Z",
             "exclusions": []
           },
           {
-            "quoteId": "q_45bc9febf77a4dbfa42d",
+            "quoteId": "q_e32191420c2e44ddb25f",
             "provider": "FastLane Remit (simulated)",
             "feasible": true,
             "rate": "495",
@@ -196,12 +196,12 @@
             "recipientWillReceive": "KZT 500,004.45",
             "roundingSurplus": "KZT 4.45",
             "usdAfterPayment": "USD 474.89",
-            "estArrivalAt": "2026-10-18T19:23:02.214Z",
-            "expiresAt": "2026-10-18T13:38:02.214Z",
+            "estArrivalAt": "2026-10-20T16:50:18.368Z",
+            "expiresAt": "2026-10-20T11:05:18.368Z",
             "exclusions": []
           },
           {
-            "quoteId": "q_c907e58b504645c6bc06",
+            "quoteId": "q_ac2f9c5641d841959608",
             "provider": "BudgetBridge (simulated)",
             "feasible": false,
             "rate": "505",
@@ -213,8 +213,8 @@
             "recipientWillReceive": "KZT 500,000.50",
             "roundingSurplus": "KZT 0.50",
             "usdAfterPayment": "USD 504.90",
-            "estArrivalAt": "2026-10-21T13:23:02.214Z",
-            "expiresAt": "2026-10-18T13:38:02.214Z",
+            "estArrivalAt": "2026-10-23T10:50:18.368Z",
+            "expiresAt": "2026-10-20T11:05:18.368Z",
             "exclusions": [
               {
                 "code": "LATE",
@@ -231,7 +231,7 @@
       "tool": null,
       "ok": null,
       "text": "Preparing an immutable proposal for the best qualifying route. No money moves yet.",
-      "at": "2026-10-18T13:23:02.222Z",
+      "at": "2026-10-20T10:50:18.373Z",
       "input": null,
       "output": null
     },
@@ -241,17 +241,17 @@
       "tool": "prepare_payment",
       "ok": true,
       "text": null,
-      "at": "2026-10-18T13:23:02.228Z",
+      "at": "2026-10-20T10:50:18.377Z",
       "input": {
-        "quote_id": "q_ad790ba43ff548ccb6e9",
+        "quote_id": "q_8298b6345f034a769e5f",
         "preference": "cheapest",
         "reserve_usd_cents": "30000"
       },
       "output": {
-        "proposalId": "prop_00eb3523b1564ad38ed3",
-        "proposalHash": "a65376fd2624c40d00650fd004b743d514eb4dbaab99444349de16d5dfec628d",
+        "proposalId": "prop_d83fee5cec1c489db55c",
+        "proposalHash": "e789464ca9e19706cee30744ab6f2b3e0cf6a2f6254c1c0212e554d0f9d752f6",
         "status": "PENDING_HUMAN_APPROVAL",
-        "expiresAt": "2026-10-18T13:38:02.214Z",
+        "expiresAt": "2026-10-20T11:05:18.368Z",
         "willBeDebited": "USD 1,010.00",
         "recipientWillReceive": "KZT 500,000.00",
         "note": "No money has moved. A human must review and approve this exact proposal."
@@ -262,8 +262,8 @@
       "kind": "assistant",
       "tool": null,
       "ok": null,
-      "text": "Proposal prop_00eb3523b1564ad38ed3 is ready: you will be debited USD 1,010.00 and the university will receive KZT 500,000.00. Nothing has been paid. Please review and approve it.",
-      "at": "2026-10-18T13:23:02.230Z",
+      "text": "Proposal prop_d83fee5cec1c489db55c is ready: you will be debited USD 1,010.00 and the university will receive KZT 500,000.00. Nothing has been paid. Please review and approve it.",
+      "at": "2026-10-20T10:50:18.378Z",
       "input": null,
       "output": null
     },
@@ -273,7 +273,7 @@
       "tool": null,
       "ok": null,
       "text": "AWAITING_APPROVAL",
-      "at": "2026-10-18T13:23:02.230Z",
+      "at": "2026-10-20T10:50:18.379Z",
       "input": null,
       "output": null
     },
@@ -283,7 +283,7 @@
       "tool": null,
       "ok": null,
       "text": "EXECUTING (human approval recorded)",
-      "at": "2026-10-18T13:23:02.233Z",
+      "at": "2026-10-20T10:50:18.380Z",
       "input": null,
       "output": null
     },
@@ -293,7 +293,7 @@
       "tool": null,
       "ok": null,
       "text": "The human approved the proposal. Executing it in the simulated ledger.",
-      "at": "2026-10-18T13:23:02.234Z",
+      "at": "2026-10-20T10:50:18.382Z",
       "input": null,
       "output": null
     },
@@ -303,18 +303,18 @@
       "tool": "execute_sandbox_payment",
       "ok": true,
       "text": null,
-      "at": "2026-10-18T13:23:02.238Z",
+      "at": "2026-10-20T10:50:18.384Z",
       "input": {
-        "proposal_id": "prop_00eb3523b1564ad38ed3"
+        "proposal_id": "prop_d83fee5cec1c489db55c"
       },
       "output": {
-        "paymentId": "pay_712c9fdbb0ee44639301",
+        "paymentId": "pay_89864df664244dd28d56",
         "simulated": true,
         "replayedFromIdempotentRetry": false,
         "debited": "USD 1,010.00",
         "recipientCredited": "KZT 500,000.00",
         "usdBalanceAfter": "USD 490.00",
-        "proposalHash": "a65376fd2624c40d00650fd004b743d514eb4dbaab99444349de16d5dfec628d"
+        "proposalHash": "e789464ca9e19706cee30744ab6f2b3e0cf6a2f6254c1c0212e554d0f9d752f6"
       }
     },
     {
@@ -323,7 +323,7 @@
       "tool": null,
       "ok": null,
       "text": "Done (SIMULATED). Debited USD 1,010.00; the university account was credited KZT 500,000.00. USD balance after: USD 490.00.",
-      "at": "2026-10-18T13:23:02.239Z",
+      "at": "2026-10-20T10:50:18.385Z",
       "input": null,
       "output": null
     },
@@ -333,19 +333,19 @@
       "tool": null,
       "ok": null,
       "text": "COMPLETED",
-      "at": "2026-10-18T13:23:02.239Z",
+      "at": "2026-10-20T10:50:18.386Z",
       "input": null,
       "output": null
     }
   ],
   "proposal": {
-    "id": "prop_00eb3523b1564ad38ed3",
+    "id": "prop_d83fee5cec1c489db55c",
     "status": "EXECUTED",
-    "hash": "a65376fd2624c40d00650fd004b743d514eb4dbaab99444349de16d5dfec628d",
+    "hash": "e789464ca9e19706cee30744ab6f2b3e0cf6a2f6254c1c0212e554d0f9d752f6",
     "payload": {
       "v": 1,
       "ownerUserId": "usr_alice",
-      "invoiceId": "inv_beb29d7049d74bd99c92",
+      "invoiceId": "inv_7084cf2fa50a4b7b8646",
       "invoiceReference": "INV-2026-0417",
       "recipientRegistryId": "UNI-ALM-001",
       "beneficiaryName": "Alatau Meridian University",
@@ -359,16 +359,16 @@
       "totalDebitCents": "101000",
       "recipientTiyn": "50000000",
       "surplusTiyn": "0",
-      "quoteId": "q_ad790ba43ff548ccb6e9",
+      "quoteId": "q_8298b6345f034a769e5f",
       "quoteVersion": 1,
       "providerId": "C",
       "providerName": "SteadyPay (simulated)",
-      "estArrivalAt": "2026-10-19T13:23:02.214Z",
-      "deadlineAt": "2026-10-20T13:23:02.016Z",
-      "quoteExpiresAt": "2026-10-18T13:38:02.214Z",
+      "estArrivalAt": "2026-10-21T10:50:18.368Z",
+      "deadlineAt": "2026-10-22T10:50:18.238Z",
+      "quoteExpiresAt": "2026-10-20T11:05:18.368Z",
       "reserveCents": "30000",
       "preference": "cheapest",
-      "proposalExpiresAt": "2026-10-18T13:38:02.214Z",
+      "proposalExpiresAt": "2026-10-20T11:05:18.368Z",
       "quoteProvenance": "SIMULATED",
       "quoteSourceNote": null,
       "quoteObservedAt": null,
@@ -376,13 +376,13 @@
         "basis": "server_ranking_v1",
         "objective": "cheapest",
         "candidateQuoteIds": [
-          "q_45bc9febf77a4dbfa42d",
-          "q_ad790ba43ff548ccb6e9",
-          "q_c907e58b504645c6bc06"
+          "q_8298b6345f034a769e5f",
+          "q_ac2f9c5641d841959608",
+          "q_e32191420c2e44ddb25f"
         ],
         "rankedFeasibleQuoteIds": [
-          "q_ad790ba43ff548ccb6e9",
-          "q_45bc9febf77a4dbfa42d"
+          "q_8298b6345f034a769e5f",
+          "q_e32191420c2e44ddb25f"
         ]
       }
     },
@@ -390,20 +390,20 @@
       "usdBalanceBeforeCents": "150000",
       "usdAfterCents": "49000"
     },
-    "createdAt": "2026-10-18T13:23:02.226Z",
-    "expiresAt": "2026-10-18T13:38:02.214Z",
+    "createdAt": "2026-10-20T10:50:18.375Z",
+    "expiresAt": "2026-10-20T11:05:18.368Z",
     "approval": {
-      "id": "apr_4f816ae6e7b54bd598fc",
-      "approvedAt": "2026-10-18T13:23:02.232Z",
-      "expiresAt": "2026-10-18T13:28:02.232Z",
-      "consumedAt": "2026-10-18T13:23:02.235Z"
+      "id": "apr_e873717cf86346fcbe6d",
+      "approvedAt": "2026-10-20T10:50:18.380Z",
+      "expiresAt": "2026-10-20T10:55:18.380Z",
+      "consumedAt": "2026-10-20T10:50:18.383Z"
     }
   },
   "humanApproval": {
-    "id": "apr_4f816ae6e7b54bd598fc",
-    "approvedAt": "2026-10-18T13:23:02.232Z",
-    "expiresAt": "2026-10-18T13:28:02.232Z",
-    "consumedAt": "2026-10-18T13:23:02.235Z"
+    "id": "apr_e873717cf86346fcbe6d",
+    "approvedAt": "2026-10-20T10:50:18.380Z",
+    "expiresAt": "2026-10-20T10:55:18.380Z",
+    "consumedAt": "2026-10-20T10:50:18.383Z"
   },
   "ledger": {
     "before": {
@@ -595,17 +595,17 @@
     }
   ],
   "receipt": {
-    "paymentId": "pay_712c9fdbb0ee44639301",
+    "paymentId": "pay_89864df664244dd28d56",
     "simulated": true,
     "disclaimer": "SIMULATED sandbox payment. No real money moved; no real bank or payment provider was contacted.",
-    "invoiceId": "inv_beb29d7049d74bd99c92",
+    "invoiceId": "inv_7084cf2fa50a4b7b8646",
     "invoiceReference": "INV-2026-0417",
-    "proposalId": "prop_00eb3523b1564ad38ed3",
-    "proposalHash": "a65376fd2624c40d00650fd004b743d514eb4dbaab99444349de16d5dfec628d",
-    "approvalId": "apr_4f816ae6e7b54bd598fc",
-    "idempotencyKey": "task:task_0b6c5b6fa6fa49cfb2e7:exec",
+    "proposalId": "prop_d83fee5cec1c489db55c",
+    "proposalHash": "e789464ca9e19706cee30744ab6f2b3e0cf6a2f6254c1c0212e554d0f9d752f6",
+    "approvalId": "apr_e873717cf86346fcbe6d",
+    "idempotencyKey": "task:task_f1044dffdea14573845a:exec",
     "provider": "SteadyPay (simulated)",
-    "quoteId": "q_ad790ba43ff548ccb6e9",
+    "quoteId": "q_8298b6345f034a769e5f",
     "quoteVersion": 1,
     "rate": "500",
     "principalCents": "100000",
@@ -618,61 +618,61 @@
     "beneficiaryName": "Alatau Meridian University",
     "recipientRegistryId": "UNI-ALM-001",
     "beneficiaryAccount": "KZ00SANDBOX0000000001",
-    "estArrivalAt": "2026-10-19T13:23:02.214Z",
-    "deadlineAt": "2026-10-20T13:23:02.016Z",
+    "estArrivalAt": "2026-10-21T10:50:18.368Z",
+    "deadlineAt": "2026-10-22T10:50:18.238Z",
     "usdBalanceBeforeCents": "150000",
     "usdBalanceAfterCents": "49000",
     "reserveCents": "30000",
-    "executedAt": "2026-10-18T13:23:02.235Z"
+    "executedAt": "2026-10-20T10:50:18.383Z"
   },
   "audit": [
     {
-      "ts": "2026-10-18T13:23:02.197Z",
+      "ts": "2026-10-20T10:50:18.356Z",
       "task_id": null,
       "mode": null,
       "event": "invoice.confirm",
       "result": "ALLOWED",
       "refs": {
-        "invoiceId": "inv_beb29d7049d74bd99c92",
+        "invoiceId": "inv_7084cf2fa50a4b7b8646",
         "issueCodes": ""
       }
     },
     {
-      "ts": "2026-10-18T13:23:02.202Z",
-      "task_id": "task_0b6c5b6fa6fa49cfb2e7",
+      "ts": "2026-10-20T10:50:18.359Z",
+      "task_id": "task_f1044dffdea14573845a",
       "mode": "MOCK",
       "event": "task.started",
       "result": "INFO",
       "refs": {
-        "invoiceId": "inv_beb29d7049d74bd99c92"
+        "invoiceId": "inv_7084cf2fa50a4b7b8646"
       }
     },
     {
-      "ts": "2026-10-18T13:23:02.215Z",
+      "ts": "2026-10-20T10:50:18.368Z",
       "task_id": null,
       "mode": null,
       "event": "quotes.issued",
       "result": "INFO",
       "refs": {
-        "invoiceId": "inv_beb29d7049d74bd99c92",
+        "invoiceId": "inv_7084cf2fa50a4b7b8646",
         "count": 3
       }
     },
     {
-      "ts": "2026-10-18T13:23:02.228Z",
-      "task_id": "task_0b6c5b6fa6fa49cfb2e7",
+      "ts": "2026-10-20T10:50:18.376Z",
+      "task_id": "task_f1044dffdea14573845a",
       "mode": "MOCK",
       "event": "proposal.created",
       "result": "ALLOWED",
       "refs": {
-        "proposalId": "prop_00eb3523b1564ad38ed3",
-        "hash": "a65376fd2624c40d00650fd004b743d514eb4dbaab99444349de16d5dfec628d",
-        "quoteId": "q_ad790ba43ff548ccb6e9"
+        "proposalId": "prop_d83fee5cec1c489db55c",
+        "hash": "e789464ca9e19706cee30744ab6f2b3e0cf6a2f6254c1c0212e554d0f9d752f6",
+        "quoteId": "q_8298b6345f034a769e5f"
       }
     },
     {
-      "ts": "2026-10-18T13:23:02.230Z",
-      "task_id": "task_0b6c5b6fa6fa49cfb2e7",
+      "ts": "2026-10-20T10:50:18.379Z",
+      "task_id": "task_f1044dffdea14573845a",
       "mode": "MOCK",
       "event": "task.state",
       "result": "INFO",
@@ -682,33 +682,33 @@
       }
     },
     {
-      "ts": "2026-10-18T13:23:02.232Z",
+      "ts": "2026-10-20T10:50:18.380Z",
       "task_id": null,
       "mode": null,
       "event": "approval.granted",
       "result": "ALLOWED",
       "refs": {
-        "proposalId": "prop_00eb3523b1564ad38ed3",
-        "approvalId": "apr_4f816ae6e7b54bd598fc",
-        "hash": "a65376fd2624c40d00650fd004b743d514eb4dbaab99444349de16d5dfec628d"
+        "proposalId": "prop_d83fee5cec1c489db55c",
+        "approvalId": "apr_e873717cf86346fcbe6d",
+        "hash": "e789464ca9e19706cee30744ab6f2b3e0cf6a2f6254c1c0212e554d0f9d752f6"
       }
     },
     {
-      "ts": "2026-10-18T13:23:02.237Z",
-      "task_id": "task_0b6c5b6fa6fa49cfb2e7",
+      "ts": "2026-10-20T10:50:18.384Z",
+      "task_id": "task_f1044dffdea14573845a",
       "mode": "MOCK",
       "event": "payment.executed",
       "result": "ALLOWED",
       "refs": {
-        "paymentId": "pay_712c9fdbb0ee44639301",
-        "proposalId": "prop_00eb3523b1564ad38ed3",
-        "approvalId": "apr_4f816ae6e7b54bd598fc",
+        "paymentId": "pay_89864df664244dd28d56",
+        "proposalId": "prop_d83fee5cec1c489db55c",
+        "approvalId": "apr_e873717cf86346fcbe6d",
         "simulated": true
       }
     },
     {
-      "ts": "2026-10-18T13:23:02.239Z",
-      "task_id": "task_0b6c5b6fa6fa49cfb2e7",
+      "ts": "2026-10-20T10:50:18.386Z",
+      "task_id": "task_f1044dffdea14573845a",
       "mode": "MOCK",
       "event": "task.state",
       "result": "INFO",
