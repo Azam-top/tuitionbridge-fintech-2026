@@ -15,10 +15,16 @@ async function reset(page: Page, scenario: string) {
   await expect(page.getByTestId("invoice-fields")).toBeVisible();
   await expect(page.getByTestId("usd-balance")).toBeVisible();
 }
-async function planPayment(page: Page, instruction?: string) {
+/** Types the instruction in the optional "own words" box (opening it first: it is collapsed by default). */
+async function words(page: Page, text: string) {
+  await page.locator("details.own-words").evaluate((el) => { (el as HTMLDetailsElement).open = true; });
+  await page.getByTestId("instruction").fill(text);
+}
+async function planPayment(page: Page, opts: { words?: string; fastest?: boolean } = {}) {
   await page.getByTestId("confirm-invoice").click();
   await expect(page.getByTestId("start-task")).toBeEnabled();
-  if (instruction) await page.getByTestId("instruction").fill(instruction);
+  if (opts.fastest) await page.getByTestId("pref-fastest").click();
+  if (opts.words) await words(page, opts.words);
   await page.getByTestId("start-task").click();
 }
 
@@ -72,7 +78,7 @@ test.describe("TuitionBridge browser flow (MOCK agent, SIMULATED payments)", () 
   test("faster preference selects the faster, costlier route", async ({ page }) => {
     await signIn(page);
     await reset(page, "standard");
-    await planPayment(page, "Pay this invoice by its deadline, prefer faster arrival, and keep USD 300 for living costs.");
+    await planPayment(page, { fastest: true }); // the objective control, not free text
     await expect(page.getByTestId("task-state")).toContainText("Waiting for your approval", { timeout: 15_000 });
     await expect(page.getByTestId("route-best")).toContainText("FastLane");
     await expect(page.getByTestId("will-debit")).toContainText("USD 1,025.11");
@@ -130,7 +136,7 @@ test.describe("TuitionBridge browser flow (MOCK agent, SIMULATED payments)", () 
     await signIn(page);
     await reset(page, "standard");
     await page.getByTestId("confirm-invoice").click();
-    await page.getByTestId("instruction").fill("use the cheapest and also the fastest route");
+    await words(page, "use the cheapest and also the fastest route");
     await page.getByTestId("start-task").click();
     await expect(page.getByTestId("error-banner")).toContainText("Both a cheapest and a fastest preference");
   });
@@ -217,7 +223,7 @@ test.describe("TuitionBridge browser flow (MOCK agent, SIMULATED payments)", () 
     await signIn(page);
     await page.getByTestId("scenario-s1").click();
     await page.getByTestId("confirm-invoice").click();
-    await page.getByTestId("instruction").fill("use the cheapest and also the fastest route");
+    await words(page, "use the cheapest and also the fastest route");
     await page.getByTestId("start-task").click();
     await expect(page.getByTestId("error-banner")).toContainText("rewrite the instruction");
   });
@@ -225,7 +231,7 @@ test.describe("TuitionBridge browser flow (MOCK agent, SIMULATED payments)", () 
     await signIn(page);
     await page.getByTestId("scenario-s1").click();
     await page.getByTestId("confirm-invoice").click();
-    await page.getByTestId("instruction").fill("cheapest feasible route, keep EUR 500");
+    await words(page, "cheapest feasible route, keep EUR 500");
     await page.getByTestId("start-task").click();
     await expect(page.getByTestId("error-banner")).toContainText("USD");
     await expect(page.getByTestId("task-panel")).toHaveCount(0);

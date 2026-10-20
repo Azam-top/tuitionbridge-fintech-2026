@@ -2,6 +2,7 @@
 // formats them and derives plain differences (for example "USD 12.50 more") from backend integers. It decides nothing.
 import { useEffect, useState } from "react";
 import type { RouteRow, TaskView } from "./api";
+import { parseInstruction } from "../shared/intent";
 import { fmtTime, formatUsd, tiynToInput } from "./format";
 import type { IconName } from "./icons";
 
@@ -65,3 +66,12 @@ export function useServerClock(serverNowIso: string | undefined): number {
 }
 
 export const prefersReducedMotion = (): boolean => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
+
+/** Preview only: the reserve the server will read out of free text (it validates and may reject it). null = the text names none. */
+export function reserveFromText(text: string): { cents: string | null; unclear: boolean } {
+  const p = parseInstruction(text);
+  return { cents: p.reserveCents, unclear: p.ambiguous.length > 0 };
+}
+
+/** The states in which a plan is "in force": its reserve is the single effective reserve everywhere. */
+export const PLAN_IN_FORCE = new Set(["RUNNING", "AWAITING_APPROVAL", "EXECUTING", "APPROVED", "COMPLETED"]);

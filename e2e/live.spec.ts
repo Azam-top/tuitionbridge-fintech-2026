@@ -45,7 +45,7 @@ async function invoice(page: Page) {
   await expect(page.getByTestId("offers-card")).toBeVisible();
 }
 async function addOffer(page: Page) {
-  await page.getByText("Enter an offer you were given").click();
+  await page.getByTestId("manual-offer").locator("summary").click();
   await page.getByTestId("offer-provider").fill("Test Bank");
   await page.getByTestId("offer-rate").fill("450");
   await page.getByTestId("offer-fee").fill("12");
@@ -58,14 +58,22 @@ async function addOffer(page: Page) {
 }
 
 test.describe("TuitionBridge LIVE mode (fake local model provider; Wise and NBK off)", () => {
-  test("honest labels: LIVE mode, model configured, no sandbox banner, no demo credentials", async ({ page }) => {
+  test("an ordinary screen: no mode badges, no model name, no token counters; technical details are one click away", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByTestId("badge-mode")).toContainText("LIVE");
-    await expect(page.getByTestId("badge-payments")).toContainText("NOT MOVED BY APP");
-    await expect(page.getByTestId("badge-agent")).not.toContainText("MOCK");
+    await expect(page.getByTestId("badge-mode")).toHaveCount(0); // not on the sign-in screen either
     await expect(page.getByTestId("sandbox-banner")).toHaveCount(0);
     await expect(page.getByText("alice@demo.local")).toHaveCount(0);
     await expect(page.getByTestId("email")).toHaveValue("");
+    await register(page);
+    await expect(page.getByTestId("badge-mode")).toBeHidden();
+    await expect(page.getByTestId("badge-agent")).toBeHidden();
+    await expect(page.getByTestId("planner")).not.toContainText("fake-model");
+    await expect(page.getByTestId("planner")).not.toContainText(/LIVE|MOCK|token/);
+    await page.getByTestId("tech-details").locator("summary").click();
+    await expect(page.getByTestId("badge-mode")).toContainText("LIVE");
+    await expect(page.getByTestId("badge-payments")).toContainText("NOT MOVED BY APP");
+    await expect(page.getByTestId("badge-agent")).not.toContainText("MOCK");
+    await expect(page.getByTestId("tech-details")).toContainText("fake-model");
   });
 
   test("full live flow: register, declare funds, attest recipient, invoice, offer, plan, approve, instruction, evidence", async ({ page }) => {
@@ -142,5 +150,95 @@ test.describe("TuitionBridge LIVE mode (fake local model provider; Wise and NBK 
     await expect(page.getByTestId("planner-no-offers")).toContainText("no payment options yet");
     await expect(page.getByTestId("start-task")).toBeDisabled();
     await expect(page.getByTestId("approval-card")).toHaveCount(0);
+  });
+});
+
+test.describe("LIVE mode, the ordinary user path (fake local model; Wise and NBK off)", () => {
+  async function ready(page: Page) {
+    await register(page);
+    await setup(page);
+    await invoice(page);
+    await addOffer(page);
+  }
+
+  test("one effective reserve everywhere: it is clear before planning and identical in every card afterwards", async ({ page }) => {
+    await ready(page);
+    // before planning: the applied reserve is stated next to the button and in the funds strip
+    await expect(page.getByTestId("reserve-applied")).toContainText("USD 300.00");
+    await expect(page.getByTestId("usd-reserve")).toContainText("USD 300.00");
+    await page.getByTestId("reserve-input").fill("200");
+    await expect(page.getByTestId("reserve-applied")).toContainText("USD 200.00");
+    await expect(page.getByTestId("usd-reserve")).toContainText("USD 200.00");
+    await expect(page.getByTestId("funds")).toContainText("Saved default: USD 300.00");
+    await expect(page.getByTestId("usd-available")).toContainText("USD 1,300.00");
+    await page.getByTestId("start-task").click();
+    await expect(page.getByTestId("task-state")).toContainText("Waiting for your approval", { timeout: 20_000 });
+    // after planning: the server's own reserve for this plan, repeated in the intent, the budget bar and the funds strip
+    await expect(page.getByTestId("intent")).toContainText("USD 200.00");
+    await expect(page.getByTestId("budget-card")).toContainText("USD 200.00");
+    await expect(page.getByTestId("usd-reserve")).toContainText("USD 200.00");
+    await expect(page.getByTestId("budget-card")).not.toContainText("USD 300.00");
+    await expect(page.getByTestId("planner")).not.toContainText("USD 1.00");
+  });
+
+  test("the planner shows the assistant's explanation, and the model name and token counters stay in the technical details", async ({ page }) => {
+    await ready(page);
+    await page.getByTestId("start-task").click();
+    await expect(page.getByTestId("task-state")).toContainText("Waiting for your approval", { timeout: 20_000 });
+    await expect(page.getByTestId("recommendation")).toBeVisible();
+    await expect(page.getByTestId("assistant-explanation")).toContainText("Explained by the AI assistant");
+    await expect(page.getByTestId("assistant-explanation")).toContainText("The proposal is ready for your review");
+    await expect(page.getByTestId("assistant-explanation")).toContainText("The server, not the assistant, ranked the routes");
+    await expect(page.getByTestId("usage")).toBeHidden(); // tokens, requests and latency are collapsed
+    await expect(page.getByTestId("task-panel")).not.toContainText("MOCK");
+    await page.getByTestId("tech-panel").locator(":scope > summary").click();
+    await expect(page.getByTestId("usage")).toContainText("tokens");
+  });
+
+  test("a model outage is explained, nothing is invented or paid, and Try again recovers", async ({ page }) => {
+    await ready(page);
+    await page.locator("details.own-words").evaluate((el) => { (el as HTMLDetailsElement).open = true; });
+    await page.getByTestId("instruction").fill("Pay this invoice by its deadline, use the cheapest feasible route, and keep USD 300 for living costs. FAKE_PROVIDER_OUTAGE");
+    await page.getByTestId("start-task").click();
+    await expect(page.getByTestId("problem")).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId("problem")).toContainText("The AI assistant could not finish");
+    await expect(page.getByTestId("task-error")).toContainText("HTTP 500");
+    await expect(page.getByTestId("problem")).toContainText("Nothing was paid");
+    await expect(page.getByTestId("task-state")).toContainText("Failed");
+    // no stand-in result and no proposal appeared
+    await expect(page.getByTestId("approval-card")).toHaveCount(0);
+    await expect(page.getByTestId("recommendation")).toHaveCount(0);
+    await expect(page.getByTestId("task-panel")).not.toContainText("MOCK");
+    // fix the cause (here: the marker that makes the fake provider fail) and retry from the same screen
+    await page.getByTestId("instruction").fill("Pay this invoice by its deadline, use the cheapest feasible route, and keep USD 300 for living costs.");
+    await page.getByTestId("retry-plan").click();
+    await expect(page.getByTestId("task-state")).toContainText("Waiting for your approval", { timeout: 30_000 });
+    await expect(page.getByTestId("problem")).toHaveCount(0);
+  });
+
+  test("after approval the Wise button opens one fixed address (shown only for a Wise offer)", async ({ page }) => {
+    await ready(page);
+    await page.getByTestId("start-task").click();
+    await expect(page.getByTestId("task-state")).toContainText("Waiting for your approval", { timeout: 20_000 });
+    await page.getByTestId("approve-btn").click();
+    await expect(page.getByTestId("instruction-card")).toBeVisible({ timeout: 20_000 });
+    // the offer here was typed by the user, so there is no Wise hand-off
+    await expect(page.getByTestId("wise-handoff")).toHaveCount(0);
+    // rendering check with a stored Wise provider offer: only the provenance and name of the stored instruction are altered in transit
+    await page.route("**/api/tasks/*", async (route) => {
+      const res = await route.fetch();
+      const json = await res.json();
+      if (json.instruction) { json.instruction.body.source.provenance = "PROVIDER_LIVE"; json.instruction.body.provider = "Wise (pay by bank transfer)"; json.instruction.body.steps = ["Open https://evil.example/pay now"]; }
+      await route.fulfill({ response: res, json });
+    });
+    await page.reload();
+    const go = page.getByTestId("go-to-wise");
+    await expect(go).toBeVisible();
+    await expect(go).toHaveAttribute("href", "https://wise.com/");
+    await expect(go).toHaveAttribute("target", "_blank");
+    await expect(go).toHaveAttribute("rel", /noopener/);
+    await expect(page.getByTestId("wise-handoff")).toContainText("Finish the payment on Wise");
+    // no other link on the card is taken from the instruction text
+    await expect(page.getByTestId("instruction-card").locator("a")).toHaveCount(1);
   });
 });

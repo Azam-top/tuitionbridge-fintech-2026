@@ -6,7 +6,7 @@
 - A recording with a **real model** has not been made (it needs your key; see `docs/LIVE_RUN.md`). If you record one, say the mode on screen.
 
 ## Before you start (3 minutes)
-1. Put your key in `.env` (`APP_LLM_API_KEY`, `APP_LLM_MODEL`), `npm run build && npm run start`, open http://127.0.0.1:8787. Badges must read `MODE: LIVE`, `AGENT: LIVE …`, `PAYMENTS: NOT MOVED BY APP`. Say the mode out loud.
+1. Put your key in `.env` (`APP_LLM_API_KEY`, `APP_LLM_MODEL`), `npm run build && npm run start`, open http://127.0.0.1:8787. The live screens carry no mode badges (they are an ordinary user app); open "Technical details" at the bottom to show `MODE: LIVE`, the model, `PAYMENTS: NOT MOVED BY APP`. Say the mode out loud.
 2. Have your real invoice, your university's official payment page, and your bank's current offer ready. Only enter what you are comfortable sharing with the model provider (the invoice fields reach it).
 3. Quotes expire (Wise ≈ 30 minutes). If you wait too long, plan again; an expired offer cannot become an instruction (a good talking point).
 
@@ -15,9 +15,9 @@
 |---|---|---|
 | 0:00 | Login screen | "TuitionBridge helps an international student choose and approve a tuition payment while protecting their living budget. This is the live mode: my account, my invoice, real sources. A separate sandbox of test data exists for the competition check." |
 | 0:30 | Set up: funds and recipient | "I declare my USD and the reserve to keep; the app reads no bank. The university becomes a trusted recipient only because I add it from its official page. An invoice can never add one." |
-| 1:15 | Invoice → confirm → offers | "I confirm the invoice fields. Options come from named sources: the Wise public quote API, or an offer I type from my bank with its source and time. The NBK rate is only a reference." |
-| 2:00 | Plan my payment → approval card | "The agent reads these stored facts and proposes one route; the server, not the model, picks the best route for my preference. The card shows the exact recipient, amounts, reserve, and where the offer came from." Approve. |
-| 3:00 | Instruction card | "The app does not move money. It issues a payment instruction. I pay in my bank or Wise. I can mark it paid or upload my confirmation: both are stored as my own evidence, never called bank verification." |
+| 1:15 | Invoice → confirm → settings | "I confirm the invoice fields. I choose lowest cost or fastest and the reserve to keep; that one reserve applies everywhere. Options come from named sources: Wise quotes fetched by the server when I plan, or an offer I type from my bank with its source and time. The NBK rate is only a reference." |
+| 2:00 | Plan my payment → approval card | "The server asks Wise for current quotes, then the assistant reads these stored facts and proposes one route, and explains it (cost, timing, reserve, why the others were excluded); the server, not the model, picks the best route for my preference. The card shows the exact recipient, amounts, reserve, and where the offer came from." Approve. |
+| 3:00 | Instruction card | "The app does not move money. It issues a payment instruction. I finish the payment on Wise (the button opens wise.com) or in my bank. I can mark it paid or upload my confirmation: both are stored as my own evidence, never called bank verification." |
 | 3:45 | Slide 7 or `viewer.html` | "30 fixed evaluation cases on the sandbox, 12 critical security gates, all passing. The real-model evaluation is run separately with my key." |
 | 4:30 | Slide 10 | "Next: real execution through a provider once access exists, student interviews, organizer confirmations." |
 

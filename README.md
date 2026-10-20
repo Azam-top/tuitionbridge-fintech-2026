@@ -15,7 +15,7 @@ Repository: <https://github.com/Azam-top/tuitionbridge-fintech-2026>
 | After approval | the app issues a **payment instruction**; it **moves no money**. You pay in your bank or Wise | a simulated ledger executes the payment (**SIMULATED**) |
 | Database | `data/live.sqlite` | `data/sandbox.sqlite` |
 
-A database file is stamped with its mode; opening a live file in sandbox mode (or the reverse) is refused, so test data and real data cannot mix. The sandbox shows a banner and badges (`MODE: SANDBOX`, `PAYMENTS: SIMULATED`).
+A database file is stamped with its mode; opening a live file in sandbox mode (or the reverse) is refused, so test data and real data cannot mix. The sandbox shows a banner and badges (`MODE: SANDBOX`, `PAYMENTS: SIMULATED`); the live screens show none: mode, model and run limits sit in a collapsed "Technical details" section.
 
 ## Install and run (local)
 

@@ -52,7 +52,7 @@ If nothing qualifies, no proposal is created.
 Manual form, a synthetic example, pasted text and text-based PDFs (`pdfjs-dist`, ≤300 KB, ≤5 pages). Extraction is a draft: ambiguous or missing fields block confirmation until the student re-enters them; the trusted recipient registry is never used to fill gaps. A beneficiary that differs from the registry blocks the invoice with a "mismatch to review", not a fraud accusation. No OCR.
 
 ## Modes and labels
-`AGENT: MOCK|LIVE`, `PAYMENTS: SIMULATED` (always), `REPLAY` for the offline evidence viewer. LIVE shows "(unverified)" until a LIVE task with provider-reported usage exists in the database.
+In the sandbox these are always visible in the header; in the live mode they sit in the collapsed "Technical details" section (the main screens stay about the payment). `AGENT: MOCK|LIVE`, `PAYMENTS: SIMULATED` (always in the sandbox), `REPLAY` for the offline evidence viewer. LIVE shows "(unverified)" until a LIVE task with provider-reported usage exists in the database.
 
 ## Live mode and sandbox (added)
 

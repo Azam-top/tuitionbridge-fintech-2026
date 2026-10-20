@@ -47,8 +47,8 @@ export function nextStep(invoice: Invoice | null, task: TaskView | null, c: Jour
   if (invoice.status === "BLOCKED") return { tone: "stop", title: "Correct the invoice", body: "The recipient or a field did not pass validation. Edit it, then revalidate and confirm." };
   if (invoice.status === "DRAFT") return { tone: "go", title: "Check the invoice details", body: "Confirm the recipient, amount and deadline are right. The agent only works on invoices you confirmed." };
   if (live && c.config?.agentStatus === "NOT_CONFIGURED") return { tone: "stop", title: "Planning needs a model", body: "Follow the setup banner above to configure a model. Your invoice and offers are saved." };
-  if (live && c.offerCount === 0) return { tone: "go", title: "Add payment options", body: "Get a live Wise quote or enter an offer from your bank. Then ask the agent to plan." };
-  return { tone: "go", title: "Tell the agent what to do", body: "Describe your preference and the living-expense reserve to keep, then press Plan my payment." };
+  if (live && c.offerCount === 0 && !c.config?.wiseQuotes) return { tone: "go", title: "Add a payment option", body: "Live Wise quotes are switched off in this setup. Enter an offer from your bank, then press Plan my payment." };
+  return { tone: "go", title: "Tell the agent what to do", body: "Choose what matters and how much to keep for living costs, then press Plan my payment. The server fetches the current Wise quotes for you." };
 }
 
 export function Journey({ invoice, task, ctx }: { invoice: Invoice | null; task: TaskView | null; ctx: JourneyCtx }) {

@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import type { Balances, Config, Invoice, Proposal, RouteRow, TaskView } from "./api";
 import { Chip } from "./components";
+import { diagnose, type Problem } from "./problems";
 import { fmtTime, formatKzt, formatUsd, kztToTiyn, tiynToInput } from "./format";
 import { Icon, type IconName } from "./icons";
-import { PROVENANCE_LABEL } from "./LivePanels";
+import { openManualOffer, PROVENANCE_LABEL } from "./LivePanels";
 import { arrivalLine, buildInstruction, diffText, span, type Preference } from "./plan";
 import { Reveal } from "./Routes";
 
@@ -36,7 +37,7 @@ function Intent({ task }: { task: TaskView["task"] }) {
       <h3>What the agent understood from you</h3>
       <ul>
         <li>Route preference: <strong>{i.preference ?? "not stated (the agent may choose; defaults to cheapest feasible)"}</strong>{i.preferenceSource ? ` (${i.preferenceSource})` : ""}</li>
-        <li>Keep for living costs: <strong>{formatUsd(i.reserveCents)}</strong> ({i.reserveSource === "instruction" ? "from your instruction" : "your account default"}). The agent cannot lower this.</li>
+        <li>Keep for living costs: <strong>{formatUsd(i.reserveCents)}</strong> ({i.reserveSource === "instruction" ? "chosen for this plan" : "your saved default"}). The agent cannot lower this.</li>
         <li>Deadline, amount and beneficiary: taken from the invoice you confirmed. The agent cannot change them.</li>
         <li className="muted">Your words: “{task.instruction}”</li>
       </ul>
@@ -53,7 +54,47 @@ function Reason({ icon, title, children }: { icon: IconName; title: React.ReactN
   );
 }
 
-/** Reserve (living costs) stepper + objective, applied by re-planning through the existing endpoints. */
+/** Objective + reserve for ONE plan. Used before planning and for re-planning; both send the same instruction to the same endpoint. */
+export function PlanControls({ pref, setPref, reserve, setReserve, balanceCents, defaultReserveCents, disabled }: {
+  pref: Preference; setPref: (p: Preference) => void; reserve: string; setReserve: (v: string) => void;
+  balanceCents: string | null; defaultReserveCents: string | null; disabled: boolean;
+}) {
+  const cents = kztToTiyn(reserve);
+  const step = (d: bigint) => {
+    const cur = BigInt(cents ?? "0") + d;
+    const max = balanceCents ? BigInt(balanceCents) : cur;
+    const next = cur < 0n ? 0n : cur > max ? max : cur;
+    setReserve(tiynToInput(next.toString()) || "0");
+  };
+  const over = cents !== null && balanceCents !== null && BigInt(cents) > BigInt(balanceCents);
+  return (
+    <div className="plan-controls" data-testid="plan-controls">
+      <div className="stepper-input">
+        <label htmlFor="reserve-input" className="small">Keep for living costs (USD)</label>
+        <div className="num-input">
+          <button type="button" className="icon-btn" onClick={() => step(-5000n)} aria-label="Keep USD 50 less" disabled={disabled}><Icon name="minus" size={16} /></button>
+          <input id="reserve-input" inputMode="decimal" value={reserve} onChange={(e) => setReserve(e.target.value)} aria-invalid={cents === null} aria-describedby="reserve-help" data-testid="reserve-input" disabled={disabled} />
+          <button type="button" className="icon-btn" onClick={() => step(5000n)} aria-label="Keep USD 50 more" disabled={disabled}><Icon name="plus" size={16} /></button>
+        </div>
+        <small id="reserve-help" className={cents === null || over ? "err" : "muted"}>
+          {cents === null ? "Enter the amount in USD, for example 300 or 300.50."
+            : over ? "This is more than the USD you declared, so no route can qualify."
+            : defaultReserveCents !== null && cents !== defaultReserveCents ? `This plan only. Your saved default is ${formatUsd(defaultReserveCents)}.`
+            : "This amount stays untouched. It is your saved default."}
+        </small>
+      </div>
+      <div role="radiogroup" aria-label="Route objective" className="seg-toggle">
+        {(["cheapest", "fastest"] as Preference[]).map((p) => (
+          <button key={p} type="button" role="radio" aria-checked={pref === p} className={pref === p ? "on" : ""} onClick={() => setPref(p)} disabled={disabled} data-testid={`pref-${p}`}>
+            <Icon name={p === "cheapest" ? "coins" : "clock"} size={16} /> {p === "cheapest" ? "Lowest cost" : "Fastest route"}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Re-plan an open proposal with another reserve or objective, through the existing cancel + create endpoints. */
 function Adjust({ view, balances, onReplan, busy }: { view: TaskView; balances: Balances; onReplan: (p: Preference, reserveCents: string) => void; busy: boolean }) {
   const startPref = (view.proposal?.payload.preference ?? view.task.intent.preference ?? "cheapest") as Preference;
   const startReserve = view.task.intent.reserveCents;
@@ -61,32 +102,45 @@ function Adjust({ view, balances, onReplan, busy }: { view: TaskView; balances: 
   const [reserve, setReserve] = useState(tiynToInput(startReserve) || "0");
   useEffect(() => { setPref(startPref); setReserve(tiynToInput(startReserve) || "0"); }, [startPref, startReserve, view.task.id]);
   const cents = kztToTiyn(reserve);
-  const max = BigInt(balances.usd.balanceCents);
-  const step = (d: bigint) => { const cur = BigInt(cents ?? "0") + d; const next = cur < 0n ? 0n : cur > max ? max : cur; setReserve(tiynToInput(next.toString()) || "0"); };
   const changed = cents !== null && (pref !== startPref || cents !== startReserve);
   return (
     <div className="adjust" data-testid="adjust">
       <h3>Adjust the plan</h3>
-      <div className="stepper-input">
-        <label htmlFor="reserve-input" className="small">Keep for living costs (USD)</label>
-        <div className="num-input">
-          <button type="button" className="icon-btn" onClick={() => step(-5000n)} aria-label="Keep USD 50 less" disabled={busy}><Icon name="minus" size={16} /></button>
-          <input id="reserve-input" inputMode="decimal" value={reserve} onChange={(e) => setReserve(e.target.value)} aria-invalid={cents === null} data-testid="reserve-input" disabled={busy} />
-          <button type="button" className="icon-btn" onClick={() => step(5000n)} aria-label="Keep USD 50 more" disabled={busy}><Icon name="plus" size={16} /></button>
-        </div>
-        {cents === null && <small className="err">Enter the amount in USD, for example 300 or 300.50.</small>}
-      </div>
-      <div role="radiogroup" aria-label="Route objective" className="seg-toggle">
-        {(["cheapest", "fastest"] as Preference[]).map((p) => (
-          <button key={p} type="button" role="radio" aria-checked={pref === p} className={pref === p ? "on" : ""} onClick={() => setPref(p)} disabled={busy} data-testid={`pref-${p}`}>
-            <Icon name={p === "cheapest" ? "coins" : "clock"} size={16} /> {p === "cheapest" ? "Lowest cost" : "Fastest route"}
-          </button>
-        ))}
-      </div>
+      <PlanControls pref={pref} setPref={setPref} reserve={reserve} setReserve={setReserve} balanceCents={balances.usd.balanceCents} defaultReserveCents={balances.usd.reserveCents} disabled={busy} />
       <button type="button" className="btn btn-block" disabled={busy || !changed || cents === null} onClick={() => onReplan(pref, cents!)} data-testid="replan">
         <Icon name="retry" size={16} /> Re-plan with these settings
       </button>
-      <p className="hint">Re-planning cancels this proposal and asks the agent again through the same checks. Nothing is paid.</p>
+      <p className="hint">Re-planning cancels this proposal and asks the assistant again through the same checks. Nothing is paid.</p>
+    </div>
+  );
+}
+
+/** The assistant's own wording, shown only when the server's grounding check accepted it. The figures above it are the server's. */
+function AssistantNote({ view }: { view: TaskView }) {
+  const text = [...view.events].reverse().find((e) => e.kind === "assistant")?.text ?? null;
+  const withheld = view.events.some((e) => e.kind === "assistant_withheld");
+  const unavailable = view.events.some((e) => e.kind === "explanation_unavailable");
+  const who = view.task.mode === "MOCK" ? "MOCK assistant (sandbox)" : "AI assistant";
+  if (!text && !withheld && !unavailable) return null;
+  return (
+    <div className="assistant" data-testid="assistant-explanation">
+      <h3><Icon name="spark" size={16} /> Explained by the {who}</h3>
+      {text ? <p>{text}</p> : <p className="muted">{unavailable ? "The assistant could not finish its explanation." : "The assistant's wording was withheld because it did not match the stored records."} The figures and reasons above come straight from the server.</p>}
+      <p className="hint">The server, not the assistant, ranked the routes and checked every amount{text ? "; the assistant's text is shown only when its numbers match the stored records" : ""}.</p>
+    </div>
+  );
+}
+
+function ProblemCard({ problem, busy, onRetry }: { problem: Problem; busy: boolean; onRetry: () => void }) {
+  return (
+    <div className="problem" role="alert" data-testid="problem" data-kind={problem.kind}>
+      <h3><Icon name="alert" size={18} /> {problem.title}</h3>
+      <p data-testid="task-error">{problem.reason}</p>
+      <p className="muted small">Nothing was paid.</p>
+      <div className="actions">
+        {problem.actions.includes("retry") && <button type="button" className="btn btn-primary" onClick={onRetry} disabled={busy} data-testid="retry-plan"><Icon name="retry" size={16} /> Try again</button>}
+        {problem.actions.includes("manual") && <button type="button" className="btn" onClick={openManualOffer} data-testid="enter-offer">Enter an offer from your bank</button>}
+      </div>
     </div>
   );
 }
@@ -158,9 +212,17 @@ function Recommendation({ view, routes, best, selectedId, nowMs }: { view: TaskV
   );
 }
 
-export function PlannerPanel({ config, live, invoice, view, offerCount, nowMs, instruction, setInstruction, starting, taskIsActive, routes, best, selectedId, balances, onStart, onReplan }: {
-  config: Config | null; live: boolean; invoice: Invoice | null; view: TaskView | null; offerCount: number; nowMs: number; instruction: string; setInstruction: (s: string) => void;
-  starting: boolean; taskIsActive: boolean; routes: RouteRow[]; best: string | null; selectedId: string | null; balances: Balances | null;
+export interface PlanInputs {
+  pref: Preference; setPref: (p: Preference) => void;
+  reserve: string; setReserve: (v: string) => void;
+  ownWords: string; setOwnWords: (v: string) => void; ownOpen: boolean; setOwnOpen: (v: boolean) => void;
+  /** The reserve the server will apply to a plan started now (preview), and the saved default it falls back to. */
+  previewReserveCents: string | null; unclearText: boolean;
+}
+
+export function PlannerPanel({ config, live, invoice, view, offerCount, nowMs, starting, taskIsActive, routes, best, selectedId, balances, inputs, onStart, onReplan }: {
+  config: Config | null; live: boolean; invoice: Invoice | null; view: TaskView | null; offerCount: number; nowMs: number;
+  starting: boolean; taskIsActive: boolean; routes: RouteRow[]; best: string | null; selectedId: string | null; balances: Balances | null; inputs: PlanInputs;
   onStart: () => void; onReplan: (p: Preference, reserveCents: string) => Promise<void>;
 }) {
   const [busy, setBusy] = useState(false);
@@ -169,29 +231,36 @@ export function PlannerPanel({ config, live, invoice, view, offerCount, nowMs, i
   const notConfigured = config?.agentStatus === "NOT_CONFIGURED";
   const confirmed = invoice?.status === "CONFIRMED";
   const closed = invoice?.status === "PAID" || invoice?.status === "INSTRUCTED";
-  const noOffers = live && offerCount === 0;
-  const canPlan = confirmed && !taskIsActive && !notConfigured && !noOffers;
-  const agentChip = config?.agentStatus === "LIVE" ? (config.llmModel ? `Model: ${config.llmModel}` : "Live model") : config?.agentStatus === "MOCK" ? "MOCK (sandbox)" : "Setup required";
+  // Planning fetches Wise by itself; only a setup with Wise switched off AND no offer at all has nothing to plan with.
+  const noSource = live && !config?.wiseQuotes && offerCount === 0;
+  // Own words are always sent as written: the server reads them and gives the precise refusal if they are unclear or conflicting.
+  const reserveOk = inputs.ownOpen && inputs.ownWords.trim() ? true : kztToTiyn(inputs.reserve) !== null;
+  const canPlan = confirmed && !taskIsActive && !notConfigured && !noSource && reserveOk;
+  const chip = notConfigured ? "Setup required" : config?.agentStatus === "MOCK" ? "MOCK (sandbox)" : null;
   async function replan(p: Preference, cents: string) { setBusy(true); try { await onReplan(p, cents); } finally { setBusy(false); } }
 
   const events = view?.events ?? [];
   const done = events.filter((e) => e.kind === "tool" && e.ok).map((e) => TOOL_PHRASE[e.tool ?? ""]).filter(Boolean);
   const infos = events.filter((e) => e.kind === "info").map((e) => e.text).filter(Boolean) as string[];
   const showRec = state === "AWAITING_APPROVAL" && view?.proposal && routes.length > 0;
+  const problem = diagnose(view);
+  const formShown = !state || (state !== "RUNNING" && state !== "AWAITING_APPROVAL" && state !== "EXECUTING");
+  const applied = inputs.previewReserveCents;
+  const defaultCents = balances?.usd.reserveCents ?? null;
 
   return (
     <aside className="planner" aria-labelledby="planner-h" data-testid="planner">
       <header className="planner-head">
         <span className="tile tile-accent" aria-hidden="true"><Icon name="spark" size={20} /></span>
         <h2 id="planner-h">Transfer planner</h2>
-        <Chip tone={notConfigured ? "bad" : "muted"}>{agentChip}</Chip>
+        {chip && <Chip tone={notConfigured ? "bad" : "muted"}>{chip}</Chip>}
       </header>
       <div aria-live="polite" className="planner-body">
         {st && <p className="planner-state"><Chip tone={st.tone}><span data-testid="task-state">{st.text}</span></Chip></p>}
 
         {notConfigured && (
           <div className="notice notice-bad" role="alert">
-            <Icon name="alert" size={18} /> <div><strong>Setup required.</strong> The planner needs a real model; the live mode has no stand-in. See the setup notice and set <code>APP_LLM_API_KEY</code> and <code>APP_LLM_MODEL</code>.</div>
+            <Icon name="alert" size={18} /> <div><strong>Setup required.</strong> The planner needs an AI model; the live mode has no stand-in. See the setup notice above.</div>
           </div>
         )}
 
@@ -199,40 +268,56 @@ export function PlannerPanel({ config, live, invoice, view, offerCount, nowMs, i
           <div className="loading" role="status" data-testid="planner-loading">
             <h3>Comparing your options…</h3>
             <ul className="steps-live">
+              {live && infos.length === 0 && <li className="now"><span className="pulse" aria-hidden="true" /> Asking Wise and the National Bank for current numbers</li>}
               {infos.map((t, i) => <li key={`i${i}`} className="done"><Icon name="check" size={16} /> {t}</li>)}
               {done.map((t, i) => <li key={`d${i}`} className="done"><Icon name="check" size={16} /> {t}</li>)}
-              <li className="now"><span className="pulse" aria-hidden="true" /> Working on the next step</li>
+              {(!live || infos.length > 0) && <li className="now"><span className="pulse" aria-hidden="true" /> Working on the next step</li>}
             </ul>
             <div className="skeleton" aria-hidden="true"><span /><span /><span /></div>
           </div>
         )}
 
         {view?.task.summary && state !== "RUNNING" && <p className="agent-says" data-testid="agent-summary"><strong>Summary:</strong> {view.task.summary}</p>}
-        {view?.task.error && state !== "CANCELLED" && <p className="alert" role="alert" data-testid="task-error"><Icon name="alert" size={18} /> {view.task.error}</p>}
+        {problem && <ProblemCard problem={problem} busy={starting || busy || taskIsActive} onRetry={onStart} />}
 
         {showRec && <Recommendation view={view!} routes={routes} best={best} selectedId={selectedId} nowMs={nowMs} />}
+        {showRec && <AssistantNote view={view!} />}
         {state === "AWAITING_APPROVAL" && balances && view && <Adjust view={view} balances={balances} onReplan={replan} busy={busy || starting} />}
         {view && <Intent task={view.task} />}
 
-        {(!state || (state !== "RUNNING" && state !== "AWAITING_APPROVAL" && state !== "EXECUTING")) && (
+        {formShown && (
           <div className="plan-form">
             {closed && <p className="muted" data-testid="planner-closed"><Icon name="info" size={16} /> {invoice?.status === "INSTRUCTED" ? "A payment instruction was issued for this invoice. Follow it outside the app; nothing more to plan." : "This invoice is already paid (simulated). Nothing more to plan."}</p>}
             {!confirmed && !closed && !notConfigured && <p className="muted"><Icon name="info" size={16} /> {invoice ? "Confirm the invoice to plan." : "Add and confirm an invoice to plan."}</p>}
-            {confirmed && noOffers && <p className="muted" data-testid="planner-no-offers"><Icon name="info" size={16} /> There are no payment options yet. Get a live quote or enter an offer from your bank above; the planner never invents one.</p>}
-            <label className="field" htmlFor="instruction-input">
-              <span>What should the agent do? (English; a Russian example is included)</span>
-              <textarea id="instruction-input" value={instruction} onChange={(e) => setInstruction(e.target.value)} rows={3} maxLength={500} data-testid="instruction" disabled={taskIsActive} />
-            </label>
-            <div className="chips">
-              {EXAMPLES.map((ex, i) => (<button key={i} type="button" className="chip-btn" onClick={() => setInstruction(ex)} disabled={taskIsActive}>Example {i + 1}</button>))}
-            </div>
+            {confirmed && noSource && <p className="muted" data-testid="planner-no-offers"><Icon name="info" size={16} /> There are no payment options yet: live Wise quotes are switched off in this setup, so add an offer from your bank below. The planner never invents one.</p>}
+            {confirmed && !closed && (
+              <>
+                <PlanControls pref={inputs.pref} setPref={inputs.setPref} reserve={inputs.reserve} setReserve={inputs.setReserve} balanceCents={balances?.usd.balanceCents ?? null} defaultReserveCents={defaultCents} disabled={taskIsActive || inputs.ownOpen && inputs.ownWords.trim().length > 0} />
+                <p className="reserve-applied" data-testid="reserve-applied">
+                  Reserve applied to this plan: <strong className="num">{applied !== null ? formatUsd(applied) : "not set"}</strong>
+                  {inputs.ownOpen && inputs.ownWords.trim() ? (inputs.unclearText ? " (your own words are unclear about it)" : " (read from your own words)") : ""}
+                </p>
+              </>
+            )}
+            {!closed && <details className="own-words" open={inputs.ownOpen} onToggle={(e) => inputs.setOwnOpen((e.target as HTMLDetailsElement).open)}>
+              <summary data-testid="own-words">Use your own words instead (optional)</summary>
+              <label className="field" htmlFor="instruction-input">
+                <span>What should the assistant do? (English; a Russian example is included)</span>
+                <textarea id="instruction-input" value={inputs.ownWords} onChange={(e) => inputs.setOwnWords(e.target.value)} rows={3} maxLength={500} data-testid="instruction" disabled={taskIsActive} />
+              </label>
+              <div className="chips">
+                {EXAMPLES.map((ex, i) => (<button key={i} type="button" className="chip-btn" onClick={() => inputs.setOwnWords(ex)} disabled={taskIsActive}>Example {i + 1}</button>))}
+              </div>
+              <p className="hint">If you write something here it replaces the settings above. The server reads the preference and reserve from it and refuses unclear or conflicting instructions.</p>
+            </details>}
             <div className="actions">
-              <button className="btn btn-primary" onClick={onStart} disabled={starting || !canPlan} data-testid="start-task"><Icon name="spark" size={16} /> Plan my payment</button>
+              <button className="btn btn-primary btn-lg" onClick={onStart} disabled={starting || !canPlan} data-testid="start-task"><Icon name="spark" size={16} /> Plan my payment</button>
               {invoice?.status !== "CONFIRMED" && invoice?.status !== "PAID" && invoice?.status !== "INSTRUCTED" && invoice && <span className="muted small">Confirm the invoice first.</span>}
               {(invoice?.status === "PAID" || invoice?.status === "INSTRUCTED") && <span className="muted small">{invoice.status === "PAID" ? "This invoice is already paid." : "A payment instruction was already issued for this invoice."}</span>}
               {notConfigured && <span className="muted small">Planning is disabled until a model is configured.</span>}
+              {confirmed && !noSource && live && <span className="muted small">Asks Wise for current quotes, then compares them.</span>}
             </div>
-            <p className="hint">The agent can read, compare and prepare. It cannot approve or lower your reserve; {live ? "after you approve, the app issues a payment instruction and moves no money." : "money moves only after you approve."}</p>
+            <p className="hint">The assistant can read, compare and prepare. It cannot approve or lower your reserve; {live ? "after you approve, the app issues a payment instruction and moves no money." : "money moves only after you approve."}</p>
           </div>
         )}
         {state === "EXECUTING" && <p role="status" className="muted"><span className="pulse" aria-hidden="true" /> Recording your approved payment in the sandbox ledger…</p>}

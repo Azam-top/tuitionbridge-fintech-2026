@@ -119,20 +119,24 @@ await pause(3500);
 await page.getByTestId("invoice-create").click();
 await page.getByTestId("confirm-invoice").click();
 await page.getByTestId("offers-card").waitFor();
-await caption(page, "Step 4: payment options come from named sources. The NBK reference rate is a guide, never an offer");
-await page.getByTestId("offers-card").scrollIntoViewIfNeeded();
-await pause(3500);
-await page.getByTestId("fetch-wise").click();
-await page.getByTestId("offers-message").waitFor({ timeout: 20_000 });
-let haveWise = (await page.getByTestId("offer-list").count()) > 0;
-if (haveWise) {
-  await caption(page, "Real Wise public quotes for this amount: rate, fee, estimated delivery and expiry come from the provider; nothing is invented");
-  await pause(6500);
-  await shot(page, "#offers", `${IMG}/live-offers.png`);
-} else {
-  await caption(page, "Wise could not be reached from this machine right now: no quote is invented. You can enter an offer from your bank instead");
-  await pause(4500);
-  await page.getByText("Enter an offer you were given").click();
+await caption(page, "Step 4: you choose what matters and how much to keep for living costs. One reserve applies to the whole plan");
+await page.getByTestId("plan-controls").scrollIntoViewIfNeeded();
+await pause(4500);
+await caption(page, "Press Plan my payment: the server asks Wise for current quotes by itself, then the assistant compares them. Nothing is typed in");
+await pause(3000);
+await page.getByTestId("start-task").click();
+await page.getByTestId("planner-loading").waitFor({ timeout: 10_000 });
+await pause(1500);
+// Real Wise quotes (read-only). If Wise cannot be reached from this machine the app says so and invents nothing; the recording shows that path.
+const outcome = await Promise.race([
+  page.getByTestId("approval-card").waitFor({ timeout: 60_000 }).then(() => "plan" as const),
+  page.getByTestId("problem").waitFor({ timeout: 60_000 }).then(() => "problem" as const),
+]);
+const haveWise = outcome === "plan";
+if (outcome === "problem") {
+  await caption(page, "Wise could not be reached from this machine right now: the app says why, invents no quote, and offers a retry or a manual offer");
+  await pause(6000);
+  await page.getByTestId("enter-offer").click();
   await page.getByTestId("offer-provider").fill("Example Bank");
   await page.getByTestId("offer-rate").fill("450");
   await page.getByTestId("offer-fee").fill("12");
@@ -141,21 +145,22 @@ if (haveWise) {
   await page.getByTestId("offer-seen").fill(local(new Date(Date.now() - 5 * 60_000)));
   await page.getByTestId("offer-note").fill("Offer typed in for this recording");
   await page.getByTestId("offer-add").click();
-  await pause(2500);
-  haveWise = false;
+  await pause(1500);
+  await page.getByTestId("retry-plan").click();
+  await page.getByTestId("approval-card").waitFor({ timeout: 60_000 });
+} else {
+  await page.getByTestId("offer-list").scrollIntoViewIfNeeded();
+  await caption(page, "Real Wise public quotes for this amount: rate, fee, estimated delivery and expiry come from the provider; nothing is invented");
+  await pause(6500);
+  await shot(page, "#offers", `${IMG}/live-offers.png`);
 }
-await page.getByTestId("start-task").scrollIntoViewIfNeeded();
-await caption(page, "Step 5: you ask the agent to plan. It reads the confirmed invoice, your declared funds and the stored offers");
-await pause(3000);
-await page.getByTestId("start-task").click();
-await page.getByTestId("approval-card").waitFor({ timeout: 30_000 });
 await page.getByTestId("approval-card").scrollIntoViewIfNeeded();
 await caption(page, "The exact proposal: recipient, amounts, reserve kept, and where this offer came from. The server chose the best route, not the model");
 await pause(8000);
 await page.getByTestId("approve-btn").click();
 await page.getByTestId("instruction-card").waitFor({ timeout: 20_000 });
 await page.getByTestId("instruction-card").scrollIntoViewIfNeeded();
-await caption(page, "After your approval the app issues a payment instruction. It has NOT moved any money: you pay in your bank or Wise");
+await caption(page, "After your approval the app issues a payment instruction. It has NOT moved any money: finish the payment on Wise or in your bank");
 await pause(8000);
 await shot(page, "#instruction-card", `${IMG}/live-instruction.png`);
 await page.getByTestId("mark-paid").click();
@@ -185,7 +190,7 @@ await pause(3500);
 await page.getByTestId("confirm-invoice").click();
 await pause(1200);
 await caption(page, "Instruction: cheapest feasible route, keep USD 300. The server validates it and shows what it understood");
-await page.getByTestId("instruction").scrollIntoViewIfNeeded();
+await page.getByTestId("plan-controls").scrollIntoViewIfNeeded();
 await pause(3500);
 await page.getByTestId("start-task").click();
 await page.getByTestId("approval-card").waitFor();

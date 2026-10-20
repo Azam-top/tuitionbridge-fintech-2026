@@ -42,7 +42,7 @@ Confirmed invoice -> declared funds -> sourced USD->KZT offers (Wise public quot
 - Tools: parse_invoice, get_balances, get_quotes, evaluate_routes, prepare_payment, execute_sandbox_payment.
 - Persisted task states: RUNNING -> AWAITING_APPROVAL -> EXECUTING -> COMPLETED | BLOCKED | FAILED | CANCELLED.
 - Limits per task (across both phases): 8 tool calls, 10 model requests, 2 transient retries, token budget, tool timeouts. One active task per user. Hitting a limit fails visibly.
-- Modes shown in the UI: agent LIVE or MOCK, payment always SIMULATED, REPLAY for offline records. MOCK is never presented as a verified live run.
+- Modes: the sandbox always shows agent MOCK and payments SIMULATED; the live mode shows them in a collapsed "Technical details" section, and shows "Setup required" in the main screen when no model is configured. REPLAY for offline records. MOCK is never presented as a verified live run.
 
 ## Phase gates
 - Session 1 gate: core flow persists a real sandbox ledger change after human approval; deterministic financial/security tests + browser flow pass; typecheck + build pass; a real provider adapter exists; live status recorded honestly.

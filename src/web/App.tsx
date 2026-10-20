@@ -1,17 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiFailure, setCsrf, type Config, type StateResponse, type TaskView } from "./api";
-import { Card, ModeBadges } from "./components";
+import { Card, ModeBadges, TechnicalDetails } from "./components";
 import { InvoiceCard } from "./InvoiceCard";
 import { TaskPanel } from "./TaskPanel";
 import { ImportCard } from "./ImportCard";
 import { GuidedDemo, type Scenario } from "./GuidedDemo";
 import { Journey } from "./Journey";
 import { FundsEditor, NewInvoiceCard, OffersCard, RecipientsCard, SetupBanner } from "./LivePanels";
-import { EXAMPLES, PlannerPanel, ReviewBar } from "./Planner";
-import { buildInstruction, prefersReducedMotion, routesOf, useServerClock, type Preference } from "./plan";
+import { PlannerPanel, ReviewBar, type PlanInputs } from "./Planner";
+import { buildInstruction, PLAN_IN_FORCE, prefersReducedMotion, reserveFromText, routesOf, useServerClock, type Preference } from "./plan";
 import { Icon, Logo } from "./icons";
 import { explain } from "./friendly";
-import { formatUsd } from "./format";
+import { formatUsd, kztToTiyn, tiynToInput } from "./format";
 
 const ACTIVE = new Set(["RUNNING", "AWAITING_APPROVAL", "EXECUTING"]);
 
@@ -21,7 +21,11 @@ export function App() {
   const [task, setTask] = useState<TaskView | null>(null);
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [instruction, setInstruction] = useState(EXAMPLES[0]);
+  // One plan's settings. The reserve follows the saved default until the user changes it for this plan.
+  const [pref, setPref] = useState<Preference>("cheapest");
+  const [reserveDraft, setReserveDraft] = useState<string | null>(null);
+  const [ownWords, setOwnWords] = useState("");
+  const [ownOpen, setOwnOpen] = useState(false);
   const [starting, setStarting] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [routeSel, setRouteSel] = useState<string | null>(null);
@@ -92,7 +96,21 @@ export function App() {
       await refresh();
     } catch (e) { setError(explain(e, "Could not start the task.")); } finally { setStarting(false); }
   }
-  const start = () => startWith(instruction);
+  const defaultReserveCents = st?.balances.usd.reserveCents ?? null;
+  const reserveText = reserveDraft ?? (defaultReserveCents !== null ? tiynToInput(defaultReserveCents) || "0" : "0");
+  const customActive = ownOpen && ownWords.trim().length > 0;
+  const parsedText = customActive ? reserveFromText(ownWords) : null;
+  // The reserve a plan started now would use (a preview: the server validates it) ...
+  const previewReserve = customActive ? (parsedText!.unclear ? null : parsedText!.cents ?? defaultReserveCents) : kztToTiyn(reserveText);
+  // ... and the ONE reserve shown in every card: the running plan's own, otherwise that preview.
+  const inForce = !!task && PLAN_IN_FORCE.has(task.task.state);
+  const effectiveReserve = inForce ? task!.task.intent.reserveCents : previewReserve;
+  const start = () => {
+    const cents = kztToTiyn(reserveText);
+    if (customActive) return startWith(ownWords);
+    if (cents === null) { setError("Enter the amount to keep for living costs in USD, for example 300 or 300.50."); return Promise.resolve(); }
+    return startWith(buildInstruction(pref, cents));
+  };
 
   /** Re-plan through the existing endpoints: cancel the waiting proposal, then ask again with the new preference and reserve. */
   async function replan(pref: Preference, reserveCents: string) {
@@ -101,7 +119,7 @@ export function App() {
     try {
       if (task && task.task.state === "AWAITING_APPROVAL") await api("POST", `/api/tasks/${task.task.id}/cancel`);
       const text = buildInstruction(pref, reserveCents);
-      setInstruction(text);
+      setPref(pref); setReserveDraft(tiynToInput(reserveCents)); setOwnWords(""); setOwnOpen(false);
       const v = await api<TaskView>("POST", "/api/tasks", { invoiceId: invoice.id, instruction: text });
       taskId.current = v.task.id;
       setTask(v);
@@ -127,10 +145,11 @@ export function App() {
   const setupDone = !!st && st.balances.usd.balanceCents !== "0" && recipients.length > 0;
   // The decision and the result lead the page; earlier or failed attempts sit after the invoice cards.
   const taskLeads = !!task && (task.task.state === "AWAITING_APPROVAL" || task.task.state === "EXECUTING" || task.task.state === "COMPLETED" || task.task.state === "APPROVED");
+  const inputs: PlanInputs = { pref, setPref, reserve: reserveText, setReserve: setReserveDraft, ownWords, setOwnWords, ownOpen, setOwnOpen, previewReserveCents: previewReserve, unclearText: !!parsedText?.unclear };
   const planner = (
     <PlannerPanel
       config={config} live={live} invoice={invoice} view={task} offerCount={offers.filter((o) => !o.expired).length} nowMs={nowMs}
-      instruction={instruction} setInstruction={setInstruction} starting={starting} taskIsActive={taskIsActive}
+      inputs={inputs} starting={starting} taskIsActive={taskIsActive}
       routes={ri?.routes ?? []} best={bestId} selectedId={routeSel} balances={st?.balances ?? null} onStart={start} onReplan={replan}
     />
   );
@@ -169,7 +188,7 @@ export function App() {
       <header className="top">
         <div className="brand"><Logo size={30} /><span className="wordmark">TuitionBridge</span></div>
         <div className="top-right">
-          <ModeBadges config={config} />
+          {config?.appMode === "sandbox" && <ModeBadges config={config} />}
           <span className="user"><span className="avatar" aria-hidden="true">{(st?.user.displayName ?? "?").slice(0, 1).toUpperCase()}</span><span className="muted small">{st?.user.displayName}</span> <button className="link" onClick={logout}>Sign out</button></span>
         </div>
       </header>
@@ -201,7 +220,7 @@ export function App() {
           config={config} current={scenarioKey}
           onLoaded={async (sc: Scenario | { server: string; instruction?: string; key: string }) => {
             taskId.current = null; setTask(null); setError(null); setSelectedId(null); setScenarioKey(sc.key);
-            if ("instruction" in sc && sc.instruction) setInstruction(sc.instruction);
+            if ("instruction" in sc && sc.instruction) { setOwnWords(sc.instruction); setOwnOpen(true); }
             await refresh();
           }}
           onError={onError}
@@ -209,7 +228,7 @@ export function App() {
       )}
 
       <main className="workspace">
-        <Budget st={st} live={live} />
+        <Budget st={st} live={live} reserveCents={effectiveReserve} planning={inForce} />
         {live && st && <FundsEditor key={st.balances.usd.balanceCents + st.balances.usd.reserveCents} balances={st.balances} locked={taskIsActive} onSaved={() => { setError(null); void refresh(); }} onError={onError} />}
         {live && <RecipientsCard recipients={recipients} onChanged={() => { setError(null); void refresh(); }} onError={onError} />}
         {taskLeads ? <>{planner}{taskPanel}{invoiceCards}</> : <>{invoiceCards}{planner}{taskPanel}</>}
@@ -219,6 +238,8 @@ export function App() {
 
       {task?.task.state === "AWAITING_APPROVAL" && task.proposal && <ReviewBar proposal={task.proposal} nowMs={nowMs} onReview={reviewPayment} />}
 
+      <TechnicalDetails config={config} />
+
       <footer className="foot muted small">
         {live ? "Live mode: your own data. The app issues payment instructions and never moves money." : `Fictional university, providers and data. Fixtures ${config?.fixturesVersion ?? ""}.`}
       </footer>
@@ -226,14 +247,21 @@ export function App() {
   );
 }
 
-function Budget({ st, live }: { st: StateResponse | null; live: boolean }) {
+/** Funds at a glance. The reserve shown is the one effective reserve of the plan (or of the plan about to start), never a second number. */
+function Budget({ st, live, reserveCents, planning }: { st: StateResponse | null; live: boolean; reserveCents: string | null; planning: boolean }) {
   if (!st) return null;
   const b = st.balances;
+  const saved = b.usd.reserveCents;
+  const avail = reserveCents !== null ? (BigInt(b.usd.balanceCents) - BigInt(reserveCents) < 0n ? "0" : (BigInt(b.usd.balanceCents) - BigInt(reserveCents)).toString()) : null;
   return (
     <section className="budget" id="funds" aria-label="Your funds" data-testid="funds">
       <div><span>{live ? "USD you declared" : "USD balance"}</span><strong className="num" data-testid="usd-balance">{formatUsd(b.usd.balanceCents)}</strong></div>
-      <div><span>Kept for living costs</span><strong className="num" data-testid="usd-reserve">{formatUsd(b.usd.reserveCents)}</strong></div>
-      <div><span>Available to pay</span><strong className="num" data-testid="usd-available">{formatUsd(b.usd.availableCents)}</strong></div>
+      <div>
+        <span>{planning ? "Kept for living costs (this plan)" : "Kept for living costs"}</span>
+        <strong className="num" data-testid="usd-reserve">{reserveCents !== null ? formatUsd(reserveCents) : "—"}</strong>
+        {reserveCents !== null && reserveCents !== saved && <small className="muted">Saved default: {formatUsd(saved)}</small>}
+      </div>
+      <div><span>Available to pay</span><strong className="num" data-testid="usd-available">{avail !== null ? formatUsd(avail) : "—"}</strong></div>
     </section>
   );
 }
@@ -260,7 +288,7 @@ function Login({ config, onDone }: { config: Config | null; onDone: (csrf: strin
   return (
     <main className="shell narrow">
       <div className="brand brand-login"><Logo size={36} /><h1 className="wordmark">TuitionBridge</h1></div>
-      <ModeBadges config={config} />
+      {config?.appMode === "sandbox" && <ModeBadges config={config} />}
       {config?.appMode === "sandbox" && <div className="sandbox-banner" role="note"><strong>SANDBOX · TEST DATA.</strong> Fictional users and providers; payments are simulated.</div>}
       <SetupBanner config={config} />
       <Card title={registering ? "Create your account" : live ? "Sign in" : "Sign in (sandbox test users)"}>

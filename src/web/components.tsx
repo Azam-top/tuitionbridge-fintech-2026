@@ -68,3 +68,21 @@ export function Details({ summary, children }: { summary: string; children: Reac
     </details>
   );
 }
+
+/** Operating facts for people who want them (and for reviewers). Collapsed by default: the main screens stay about the payment. */
+export function TechnicalDetails({ config }: { config: Config | null }) {
+  if (!config) return null;
+  const live = config.appMode === "live";
+  return (
+    <details className="card tech" data-testid="tech-details">
+      <summary>Technical details</summary>
+      <ModeBadges config={config} />
+      <dl className="rows tech-rows">
+        <Row label="Assistant model">{config.agentStatus === "NOT_CONFIGURED" ? "not configured" : config.llmModel ?? (config.agentStatus === "MOCK" ? "MOCK stand-in (sandbox only)" : "unknown")}</Row>
+        <Row label="Payments">{live ? "The app never moves money; it issues payment instructions." : "Simulated in a test ledger."}</Row>
+        <Row label="Run limits">{config.limits.maxToolCalls} tool calls, {config.limits.maxModelRequests} model requests, {config.limits.maxTransientRetries} retries per plan</Row>
+        {live && <Row label="Wise quotes">{config.wiseQuotes ? "fetched by the server when you plan" : "switched off (APP_WISE_QUOTES)"}</Row>}
+      </dl>
+    </details>
+  );
+}

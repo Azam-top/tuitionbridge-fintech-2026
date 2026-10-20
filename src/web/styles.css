@@ -260,3 +260,22 @@ section.card + .workspace { margin-top: 0; }
 @media (forced-colors: active) { .route.selected, .next, .planner { border-width: 3px; } }
 
 .ok-text { color: var(--ok); } .warn-text { color: var(--warn); } .ok-text svg, .warn-text svg { vertical-align: -2px; }
+
+/* ---------- plan settings, problems, assistant note, Wise hand-off, technical details ---------- */
+.plan-controls { display: grid; gap: 12px; }
+.reserve-applied { font-size: .9rem; color: var(--muted); }
+.reserve-applied strong { color: var(--text); }
+.budget small { font-size: .74rem; }
+.own-words { border: 1px solid var(--line); border-radius: 12px; padding: 0 12px; background: var(--surface-2); }
+.own-words > summary { cursor: pointer; color: var(--accent); font-size: .88rem; min-height: 44px; display: flex; align-items: center; }
+.own-words[open] { padding-bottom: 12px; } .own-words[open] > summary { margin-bottom: 4px; }
+.problem { border: 1px solid rgba(242, 136, 124, .4); background: var(--bad-bg); border-radius: 14px; padding: 12px 14px; display: grid; gap: 6px; margin: .6rem 0; }
+.problem h3 { display: flex; gap: 8px; align-items: center; margin: 0; color: #ffd6d0; } .problem h3 svg { color: var(--bad); flex: none; }
+.problem .actions { margin-top: 4px; }
+.assistant { border-top: 1px solid var(--line); margin-top: 14px; padding-top: 12px; }
+.assistant h3 { display: flex; gap: 8px; align-items: center; color: var(--muted); font-weight: 560; }
+.assistant p:not(.hint) { font-size: .92rem; white-space: pre-line; }
+.handoff { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; border: 1px solid var(--line-2); background: var(--accent-dim); border-radius: 14px; padding: 12px 14px; margin: 12px 0; }
+.handoff .btn { text-decoration: none; }
+.tech-rows { margin-top: 10px; }
+.tech > .badges { margin-top: 12px; }

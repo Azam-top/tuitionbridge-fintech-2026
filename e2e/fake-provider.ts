@@ -25,6 +25,8 @@ const server = createServer((req, res) => {
         }
       }
     }
+    // Test switch: an instruction containing FAKE_PROVIDER_OUTAGE makes this fake answer HTTP 500, to exercise the app's failure states.
+    if (/FAKE_PROVIDER_OUTAGE/.test(first)) { res.writeHead(500, { "content-type": "application/json" }); res.end(JSON.stringify({ type: "error", error: { type: "api_error", message: "simulated outage" } })); return; }
     const preference = /fast/i.test(first) ? "fastest" : "cheapest";
     const reserve = /reserve_hint=(\d+)/.exec(first)?.[1] ?? "30000";
     let n = 0;

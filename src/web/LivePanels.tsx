@@ -4,6 +4,9 @@ import { Card, Chip, Row } from "./components";
 import { fmtTime, formatKzt, formatUsd, kztToTiyn, tiynToInput } from "./format";
 import { Icon } from "./icons";
 
+/** The one fixed address the "Go to Wise" button opens. It is a constant: no offer, invoice or model text can change it. */
+export const WISE_URL = "https://wise.com/";
+
 const fail = (e: unknown, fallback: string) => (e instanceof ApiFailure ? e.message : fallback);
 
 export const PROVENANCE_LABEL: Record<string, string> = {
@@ -40,9 +43,9 @@ export function FundsEditor({ balances, locked, onSaved, onError }: { balances: 
     <details className="card tech" open={empty} data-testid="funds-editor">
       <summary>Your declared funds{empty ? " (set these first)" : ""}</summary>
       <form className="form" onSubmit={save}>
-        <p className="muted small">Self-reported: the app does not read your bank. The reserve is the USD you must keep for living costs; the agent can never lower it.</p>
+        <p className="muted small">Self-reported: the app does not read your bank. The reserve is the USD you keep for living costs. Each plan starts from this amount; you can change it for one plan, and the agent can never lower it.</p>
         <label className="field"><span>USD available to you</span><input inputMode="decimal" value={bal} onChange={(e) => setBal(e.target.value)} data-testid="funds-balance-input" disabled={locked} /></label>
-        <label className="field"><span>USD to keep for living costs</span><input inputMode="decimal" value={res} onChange={(e) => setRes(e.target.value)} data-testid="funds-reserve-input" disabled={locked} /></label>
+        <label className="field"><span>USD to keep for living costs (your default for each plan)</span><input inputMode="decimal" value={res} onChange={(e) => setRes(e.target.value)} data-testid="funds-reserve-input" disabled={locked} /></label>
         <div className="actions"><button className="btn btn-primary" disabled={busy || locked} data-testid="funds-save">Save declared funds</button>{locked && <span className="muted small">Finish or cancel the active task first.</span>}</div>
       </form>
     </details>
@@ -130,6 +133,15 @@ export function ReferenceLine({ reference }: { reference: Reference | null }) {
   );
 }
 
+/** Opens the optional manual-offer form and brings it into view (used by the "enter an offer yourself" action). */
+export function openManualOffer(): void {
+  const d = document.getElementById("manual-offer") as HTMLDetailsElement | null;
+  if (!d) return;
+  d.open = true;
+  d.scrollIntoView({ behavior: window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center" });
+  (d.querySelector("input") as HTMLElement | null)?.focus({ preventScroll: true });
+}
+
 export function OffersCard({ invoice, offers, reference, config, onChanged, onError }: {
   invoice: Invoice; offers: Offer[]; reference: Reference | null; config: Config; onChanged: () => void; onError: (m: string) => void;
 }) {
@@ -154,10 +166,11 @@ export function OffersCard({ invoice, offers, reference, config, onChanged, onEr
   return (
     <Card id="offers" title="Payment options and their sources">
       <div data-testid="offers-card">
+        <p className="muted small">{config.wiseQuotes ? "Press “Plan my payment” and the server asks Wise for current quotes by itself. You can also refresh them here." : "Live Wise quotes are switched off in this setup, so offers come only from what you enter below."}</p>
         <ReferenceLine reference={reference} />
         <div className="actions">
           {config.wiseQuotes
-            ? <button className="btn" onClick={fetchWise} disabled={busy} data-testid="fetch-wise"><Icon name={busy ? "clock" : "globe"} size={16} /> {busy ? "Asking Wise…" : "Get live Wise quotes"}</button>
+            ? <button className="btn" onClick={fetchWise} disabled={busy} data-testid="fetch-wise"><Icon name={busy ? "clock" : "globe"} size={16} /> {busy ? "Asking Wise…" : offers.length ? "Refresh Wise quotes" : "Get Wise quotes now"}</button>
             : <span className="muted small">Live Wise quotes are switched off (set APP_WISE_QUOTES=1). You can still enter offers you were given.</span>}
           {msg && (
             <span role="status" className={msg.status === "OK" ? "small ok-text" : "small warn-text"} data-testid="offers-message">
@@ -165,7 +178,7 @@ export function OffersCard({ invoice, offers, reference, config, onChanged, onEr
             </span>
           )}
         </div>
-        {offers.length === 0 ? <p className="muted" data-testid="no-offers">No offers yet. Fetch a live quote or enter an offer from your bank or provider. The app never invents one.</p> : (
+        {offers.length === 0 ? <p className="muted" data-testid="no-offers">No offers yet. They appear here once the planner has asked Wise, or when you add one from your bank. The app never invents an offer.</p> : (
           <ul className="plain" data-testid="offer-list">
             {offers.map((o) => (
               <li key={o.id} className={o.expired ? "expired" : ""}>
@@ -177,8 +190,8 @@ export function OffersCard({ invoice, offers, reference, config, onChanged, onEr
             ))}
           </ul>
         )}
-        <details className="inline-details">
-          <summary>Enter an offer you were given (bank or provider)</summary>
+        <details className="inline-details" id="manual-offer" data-testid="manual-offer">
+          <summary>Optional: add an offer you were given by your bank or provider</summary>
           <form className="form" onSubmit={add}>
             <label className="field"><span>Provider or bank</span><input value={f.providerName} onChange={(e) => setF({ ...f, providerName: e.target.value })} data-testid="offer-provider" /></label>
             <label className="field"><span>Rate (KZT per 1 USD)</span><input inputMode="decimal" value={f.rate} onChange={(e) => setF({ ...f, rate: e.target.value })} data-testid="offer-rate" /></label>
@@ -226,6 +239,14 @@ export function InstructionCard({ instruction: ins, onChanged, onError }: { inst
           <Row label="Estimated arrival (an estimate)">{fmtTime(b.estimatedArrival)}</Row>
           <Row label="Offer source">{PROVENANCE_LABEL[b.source.provenance] ?? b.source.provenance}{b.source.observedAt ? `, seen ${fmtTime(b.source.observedAt)}` : ""}{b.source.note ? `: ${b.source.note}` : ""}</Row>
         </dl>
+        {!cancelled && b.source.provenance === "PROVIDER_LIVE" && /^wise\b/i.test(b.provider) && (
+          <div className="handoff" data-testid="wise-handoff">
+            <a className="btn btn-primary btn-lg" href={WISE_URL} target="_blank" rel="noopener noreferrer" data-testid="go-to-wise">
+              Go to Wise <Icon name="arrowRight" size={18} />
+            </a>
+            <p className="muted small">Finish the payment on Wise. It opens wise.com in a new tab; this app cannot pay for you.</p>
+          </div>
+        )}
         <h3>What to do</h3>
         <ol>{b.steps.map((s, i) => <li key={i}>{s}</li>)}</ol>
         {ins.evidence.length > 0 && (
