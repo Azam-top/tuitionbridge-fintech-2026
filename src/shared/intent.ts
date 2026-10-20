@@ -13,7 +13,10 @@ export interface ParsedIntent {
 const CHEAP = /(cheap|lowest\s+(cost|fee|price)|least\s+expensive|min(imum)?\s+(cost|fee)|деш[её]в|минимальн\S*\s+(комисси|стоимост))/i;
 const FAST = /(fast|quick|soon|earliest|speed|быстр|скор|поскорее)/i;
 const RESERVE_WORDS = "(?:keep|reserve|retain|leave|save|hold|оставь|оставить|сохрани|сохранить|резерв)";
-const CUR = "(?:usd|\\$|us\\s*dollars?|dollars?|долл\\S*|доллар\\S*)";
+const USD_TOKEN = "(?:usd|us\\s*dollars?|dollars?|долл\\S*|доллар\\S*)";
+const OTHER_TOKEN = "(?:eur|euros?|евро|kzt|tenge|тенге|gbp|pounds?|rub|rubles?|руб\\S*|cny|rmb|yuan|юан\\S*|jpy|yen|aed|dirhams?)";
+const SYMBOL = "[$€£₸¥₽]";
+const CUR = `(?:${USD_TOKEN}|${OTHER_TOKEN}|${SYMBOL})`;
 const NUM = "(\\d{1,3}(?:,\\d{3})+|\\d+)(?:\\.(\\d{1,2}))?";
 
 function detectLanguage(text: string): ParsedIntent["language"] {
@@ -21,6 +24,8 @@ function detectLanguage(text: string): ParsedIntent["language"] {
   if (/[a-z]/i.test(text)) return "en";
   return "unknown";
 }
+
+const isUsd = (cur: string): boolean => cur === "$" || new RegExp(`^${USD_TOKEN}$`, "i").test(cur);
 
 function toCents(whole: string, frac?: string): string {
   const w = BigInt(whole.replace(/,/g, ""));
@@ -39,13 +44,24 @@ export function parseInstruction(text: string): ParsedIntent {
   } else if (cheap) preference = "cheapest";
   else if (fast) preference = "fastest";
 
+  // Collect every reserve mention with its currency. Several different amounts, or a currency other
+  // than USD, are surfaced for clarification instead of silently picking one.
+  const mention = new RegExp(`${RESERVE_WORDS}[^\\d$€£₸¥₽]{0,40}?(${CUR})?\\s*${NUM}(?:\\s*(${CUR}))?`, "gi");
+  const amounts = new Set<string>();
+  const foreign = new Set<string>();
+  for (const m of text.matchAll(mention)) {
+    const cur = (m[1] ?? m[4] ?? "").trim();
+    if (cur && !isUsd(cur)) foreign.add(cur);
+    else amounts.add(toCents(m[2], m[3]));
+  }
   let reserveCents: string | null = null;
-  const before = new RegExp(`${RESERVE_WORDS}[^\\d$]{0,40}?${CUR}?\\s*${NUM}`, "i");
-  const after = new RegExp(`${RESERVE_WORDS}[^\\d$]{0,40}?${NUM}\\s*${CUR}`, "i");
-  const m1 = before.exec(text);
-  const m2 = after.exec(text);
-  const hit = m2 ?? m1;
-  if (hit) reserveCents = toCents(hit[1], hit[2]);
+  if (foreign.size) {
+    ambiguous.push(`The reserve currency (${[...foreign].join(", ")}) is not supported; the living-expense reserve must be in USD.`);
+  } else if (amounts.size > 1) {
+    ambiguous.push("Several different reserve amounts were mentioned.");
+  } else if (amounts.size === 1) {
+    reserveCents = [...amounts][0];
+  }
   if (reserveCents !== null && BigInt(reserveCents) === 0n) {
     ambiguous.push("A zero reserve was requested.");
   }

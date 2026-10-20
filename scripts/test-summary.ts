@@ -1,6 +1,7 @@
 // Runs the unit/integration and browser suites and writes MEASURED totals to artifacts/evidence/test-summary.json.
 import { spawnSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { gitInfo } from "./lib/provenance";
 
 const run = (cmd: string, args: string[]) => spawnSync(cmd, args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
 const TMP = "artifacts/tmp";
@@ -15,6 +16,7 @@ const pkg = JSON.parse(readFileSync("package.json", "utf8")) as { version: strin
 
 const summary = {
   generatedAt: new Date().toISOString(), node: process.version, projectVersion: pkg.version,
+  sourceCommit: gitInfo().head, sourceDirty: gitInfo().dirty,
   typecheck: tc.status === 0 ? "pass" : "FAIL",
   unitAndIntegration: { files: vj.testResults.length, total: vj.numTotalTests, passed: vj.numPassedTests, failed: vj.numFailedTests },
   browser: { runner: "Playwright + system Google Chrome", total: ej.stats.expected + ej.stats.unexpected + ej.stats.flaky + ej.stats.skipped, passed: ej.stats.expected, failed: ej.stats.unexpected, flaky: ej.stats.flaky, skipped: ej.stats.skipped },

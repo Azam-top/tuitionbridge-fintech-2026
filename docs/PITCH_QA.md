@@ -15,8 +15,9 @@ Safety does not depend on the model. There is no approval tool; the execution to
 **How do you handle failures?**
 Provider errors: up to 2 bounded retries, then a visible FAILED state with nothing paid. Limits (8 tool calls, 10 model requests, token budget) fail visibly. Expired quote or approval: refused, nothing paid, plan again. Recipient mismatch or ambiguity: invoice blocked with a recoverable correction path. Server restart mid-task: the task is marked interrupted, or completed if the payment had already been recorded.
 
-**Is the live model working?**
-Not verified. The adapter uses the official SDK and is tested against a local fake provider; a bounded smoke test (`npm run smoke:live`) and a small live evaluation (`npm run eval:live`) are ready but require a configured key and were not run.
+**Is the live model working? What is real and what is test data?**
+The live mode needs a real model and uses real sources (Wise public quotes, offers the student types, the NBK reference); the sandbox is separate, labeled test data. The live mode does not move money.
+Partly verified. One bounded real-model smoke test passed on 2026-10-19 (a second, on the final sources on 2026-10-20, did not pass: Wise's rounded rate made every Wise option fail the app's exact-total check, so no proposal was made and nothing was invented): Groq `openai/gpt-oss-120b`, a synthetic student, real Wise quotes, the plan confirmed by the script, no payment (details and limits in `docs/LIVE_SMOKE_RESULT.md`). The five-case live evaluation (`npm run eval:live`) and a manual pass with a real invoice have not been run, so the LIVE mode is not fully verified. Browser tests use a local fake provider. A report from a fake provider, MOCK, a failed run or a stale source is never shown as a real-model result.
 
 **What do the evaluation numbers mean?**
 30 fixed cases, deterministic: model-driven cases use the MOCK agent, adversarial and failure cases use scripted models or direct calls. 30/30 pass with 12/12 critical cases and zero unauthorized payments. That is evidence about the server's policy layer, not about real-model behavior. Targets (≥27/30, all critical) are ours, not the organizers'.
@@ -34,4 +35,7 @@ Our "security and compliance" work is design controls (tiers, approval binding, 
 The International Track brief: task completion 40%, security and compliance 30%, innovation and interaction 30%. The general site lists different labels at the same weights; we asked the organizers which governs.
 
 **Who did the work and how was AI used?**
-See `AI_USAGE.md`: AI-assisted coding with Claude Code; human review is for the team to complete and is not yet recorded.
+See `AI_USAGE.md`: AI-assisted coding with Claude Code; roles are separated there, and a full human review of the source code is not documented yet.
+
+**Why is there no SWIFT integration?**
+Because there is no honest way to add one in this project. SWIFT has no public quote or payment API: sending and tracking (gpi) go through a bank that is a SWIFT member, under that bank's contract, and the fees of intermediary banks are usually unknown in advance. An integration we cannot test against a real counterparty would be a mock presented as a feature, which this project refuses to do. What exists today: a bank's SWIFT wire is a valid option when the student types in the offer from their bank (rate, fixed fee, arrival, validity, source and time seen); it is then compared, ranked and bound into the proposal like any other option, with "intermediary bank charges may apply" left as an unknown, never guessed. A real bank or SWIFT-based execution and tracking is future work that needs a partner bank's access.

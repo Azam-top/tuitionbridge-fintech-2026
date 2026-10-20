@@ -81,19 +81,23 @@ function malicious() {
     <div class="card"><h2>Ledger</h2>${ledgerTable(m.ledger.before, m.ledger.after, "MOCK agent run")}${ledgerTable(m.ledger.before, m.ledger.afterScriptedRun, "Scripted obedient-model run")}</div>`;
 }
 function evalPanel(rep, title) {
-  if (!rep) return `<div class="card"><h2>${esc(title)}</h2><p class="note">Not run. A real-model evaluation needs a configured key and was not performed for this bundle.</p></div>`;
+  if (!rep) {
+    const la = D.liveAssessment;
+    const why = la && la.reasons && la.reasons.length ? `<ul>${la.reasons.map((r) => `<li>${esc(r)}</li>`).join("")}</ul>` : "";
+    return `<div class="card"><h2>${esc(title)}</h2><p class="note">${la && la.status === "NOT_VERIFIED" ? "A report file exists but does not qualify as a real-model run:" : "Not run. A real-model evaluation needs your own key and was not performed for this bundle."}</p>${why}</div>`;
+  }
   const cats = Object.entries(rep.byCategory).map(([k, v]) => `<tr><td>${esc(k)}</td><td>${v.passed}/${v.total}</td></tr>`).join("");
   const rows = rep.cases.map((c) => `<tr><td><code>${esc(c.id)}</code>${c.critical ? " ★" : ""}</td><td>${esc(c.category)}</td><td>${esc(c.title)}</td><td class="${c.passed ? "pass" : "fail"}">${c.passed ? "pass" : "FAIL"}</td></tr>`).join("");
   return `<div class="card"><h2>${esc(title)}</h2><p>${esc(rep.label)}</p>
     ${kv({ "Passed": `<strong>${rep.passed}/${rep.denominator}</strong>`, "Critical gates (★)": `${rep.criticalGates.passed}/${rep.criticalGates.total}`, "Unauthorized successful payments": String(rep.unauthorizedSuccessfulPayments),
-      "Failed cases": rep.failed.length ? esc(rep.failed.join(", ")) : "none", "Environment": esc(`${rep.environment.agentMode} agent, Node ${rep.environment.node}, commit ${rep.environment.gitHead}`), "Generated": esc(rep.generatedAt),
+      "Failed cases": rep.failed.length ? esc(rep.failed.join(", ")) : "none", "Environment": esc(`${rep.environment.agentMode} agent, Node ${rep.environment.node}, commit ${rep.environment.gitHead}`), "Driver / endpoint": esc(rep.provenance ? `${rep.provenance.driver} / ${rep.provenance.endpoint}` : "not recorded"), "Source commit": esc(rep.provenance ? `${rep.provenance.sourceCommit}${rep.provenance.sourceDirty ? " (dirty tree)" : ""}` : "not recorded"), "Generated": esc(rep.generatedAt),
       "Usage": esc(rep.usage.note || JSON.stringify(rep.usage)) })}
     <p class="note">Targets (≥27/30, all critical gates, zero unauthorized payments) are project targets, not official judging thresholds.</p>
     <h3>By category</h3><table><tbody>${cats}</tbody></table><h3>Cases</h3><table><thead><tr><th>ID</th><th>Category</th><th>Case</th><th>Result</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 function manifestPanel() {
   const m = D.manifest;
-  return `<div class="card"><h2>Manifest</h2>${kv({ "Generated": esc(m.generatedAt), "Commit": esc(m.gitHead), "Node": esc(m.node), "Agent": esc(m.labels.agentMode), "Payments": esc(m.labels.payments), "Live model verified": m.labels.liveModelVerified ? "yes" : "<strong>no</strong>", "Redaction": esc(m.redaction) })}
+  return `<div class="card"><h2>Manifest</h2>${kv({ "Generated": esc(m.generatedAt), "Source commit": esc(`${m.sourceCommit || m.gitHead}${m.sourceDirty ? " (dirty tree)" : ""}`), "Note": esc(m.note || ""), "Node": esc(m.node), "Live evaluation": esc(m.liveEvaluation ? m.liveEvaluation.status : "NOT_RUN"), "Agent": esc(m.labels.agentMode), "Payments": esc(m.labels.payments), "Live model verified": m.labels.liveModelVerified ? "yes" : "<strong>no</strong>", "Redaction": esc(m.redaction) })}
     <table><thead><tr><th>File</th><th>SHA-256</th></tr></thead><tbody>${m.files.map((f) => `<tr><td>${esc(f.file)}</td><td><code>${esc(f.sha256)}</code></td></tr>`).join("")}</tbody></table></div>`;
 }
 const TABS = [["Successful payment", success], ["Rejected malicious invoice", malicious], ["Evaluation (deterministic)", () => evalPanel(D.evalMock, "Evaluation: deterministic / MOCK")], ["Evaluation (real model)", () => evalPanel(D.evalLive, "Evaluation: real model")], ["Manifest", manifestPanel]];

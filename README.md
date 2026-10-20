@@ -1,62 +1,65 @@
 # TuitionBridge
 
-A competition prototype (2026 Shenzhen International FinTech Competition, International Track, Topic C). An international student gives an agent a tuition invoice, a deadline, balances and a living-expense reserve. The agent compares three **simulated** USD→KZT routes, prepares a feasible payment, **waits for the student's approval**, then executes it in a local sandbox ledger and produces a receipt with tool-call evidence.
+TuitionBridge helps international students compare tuition payment options against their deadline and living budget. Review the invoice, choose a plan, approve it, and complete the payment with the provider.
 
-**Everything is synthetic.** Fictional university, fictional providers, fake accounts. No real money moves and no real bank or payment provider is contacted. The UI always shows `PAYMENTS: SIMULATED`, and `AGENT: MOCK` unless a model key is configured.
+The app never moves money. You finish the payment with the provider, for example Wise. Wise quotes are preliminary and can change. For Wise, the totals come from the provider's own response, not from a displayed rate. The sandbox uses separate fictional test data.
 
-Repository: <https://github.com/Azam-top/tuitionbridge-fintech-2026>
+## Requirements
 
-## Install and run
+- Node.js 24 or newer (tested on 26.11.1) and npm
+- Google Chrome, for the browser tests only
+- An AI model key, for the normal app only (the sandbox needs none)
 
-Requires Node ≥ 24 (developed and tested on Node 26.11; Node 24 not run). `better-sqlite3` is a native module; npm 12 blocks install scripts by default, and `package.json` already allow-lists `better-sqlite3` and `esbuild`. If `npm install` still warns, run `npm install-scripts approve better-sqlite3 esbuild`.
+## Install
 
 ```bash
-npm install
-npm run build          # builds the UI to dist/web
-npm run start          # http://127.0.0.1:8787 (loopback only); seeds a demo DB on first run
+npm ci
+npm run build
 ```
 
-Local demo accounts (synthetic, local only): `alice@demo.local` / `demo-alice-2026` and `bob@demo.local` / `demo-bob-2026`.
+## Run (one mode at a time)
 
-**Reset:** the "Guided demo" panel resets all demo data and loads a scenario (successful payment; cheapest route rejected for lateness; malicious invoice; insufficient funds; more under "More datasets"). From the terminal: `npm run reset-demo`. The deadline is always 48 h after a reset; quotes expire after 15 minutes (plan again for fresh quotes). `APP_DEMO_MODE=0` disables the reset endpoint.
+Both modes use http://127.0.0.1:8787, so stop one before starting the other.
 
-Development: `npm run dev:server` and `npm run dev:web` (Vite proxies `/api`).
+**Normal app** (your own data):
 
-## Agent modes (runtime setup)
+```bash
+cp .env.example .env    # set APP_LLM_PROVIDER, APP_LLM_API_KEY and APP_LLM_MODEL
+npm run start
+```
 
-- **MOCK** (default): a deterministic stand-in drives the same tools, policies and database as the live adapter. It is labeled MOCK and reports no token usage. It is not a live model run.
-- **LIVE**: copy `.env.example` to `.env` and set `APP_LLM_API_KEY` and `APP_LLM_MODEL` (server-only; `ANTHROPIC_API_KEY` is intentionally never read, so an exported key cannot switch other tools to API billing). Then `npm run smoke:live` for one bounded synthetic task (spends real credits). The badge reads `LIVE (unverified)` until a LIVE task with provider-reported usage exists in the database.
+**Sandbox** (test data, no key):
 
-**LIVE MODE NOT VERIFIED in this repository.** The adapter (official `@anthropic-ai/sdk`, isolated behind an interface) is tested against a local fake provider only. The provider's regional availability may not cover the Shenzhen venue; an organizer-approved provider must be confirmed.
+```bash
+npm run start:sandbox
+```
 
-## Test, evaluate, export
+Sandbox sign-in: `alice@demo.local` / `demo-alice-2026` (or `bob@demo.local` / `demo-bob-2026`). Never commit `.env`.
 
-| Command | What it does |
-|---|---|
-| `npm run typecheck` | TypeScript strict check |
-| `npm test` | vitest: money, policy, security services, agent, HTTP, cross-process concurrency, adapter vs fake provider, invoice import |
-| `npm run test:e2e` | Playwright browser flow with system Google Chrome (no browser download) |
-| `npm run eval` | 30 fixed cases, deterministic (MOCK + scripted drivers) → `artifacts/evidence/eval-mock.json` |
-| `APP_EVAL_LIVE=1 npm run eval:live -- --max-cases=6` | optional bounded real-model run of the model-driven cases (needs a key; spends credits) |
-| `npm run test:summary` | runs type check + both suites and writes measured totals to `artifacts/evidence/test-summary.json` |
-| `npm run evidence` | exports redacted evidence + the offline REPLAY viewer to `artifacts/evidence/` |
-| `npm run demo:capture` | records the captioned demo video and slide screenshots from the real app |
-| `npm run deck` | builds `docs/deck/index.html` and the PDFs from measured files |
-| `npm run licenses` | writes `docs/DEPENDENCIES.md` |
-| `npm run package` | allowlisted, secret-scanned submission archives in `dist-submission/` |
+## Use it
 
-## Documents
+1. Enter your USD funds and the living reserve. Add your university's account from its official payment page.
+2. Enter the invoice and confirm every field.
+3. Choose lowest cost or fastest, then press **Plan my payment**. The server gets current Wise quotes. You can also add an offer from your bank.
+4. Read the recommendation and the exact amounts, then approve.
+5. Press **Continue on Wise** and pay there. Anything you mark or attach afterwards is your own record, not bank confirmation.
 
-`docs/ARCHITECTURE.md` (design and quote algorithm) · `docs/SECURITY.md` (permission tiers, controls, tested attacks, known limits) · `docs/PROJECT_SPEC.md` (contract and open organizer questions) · `docs/DEMO_SCRIPT.md` · `docs/PITCH_QA.md` · `docs/deck/` (slides, speaker notes, PDFs) · `AI_USAGE.md` · `docs/DEPENDENCIES.md` · `SUBMISSION_CHECKLIST.md` · `docs/HANDOFF.md`.
+In the sandbox, pick a demo scenario, confirm, plan and approve. The payment is simulated.
 
-## What is in the box
+## Checks
 
-- **Money:** BigInt minor units (USD cents, KZT tiyn); integer strings on the wire; exact decimal rates. `principal = ceil(tuition / rate)`, `total debit = principal + fixed fee`, recipient amount rounded down from the rounded-up principal; the rounding surplus is shown.
-- **Route policy:** only routes that are eligible, unexpired, arrive by the deadline and leave the reserve intact are ranked; deterministic tie-breaking.
-- **Security:** server sessions, CSRF + Origin checks, owner-scoped records, read/propose/execute tiers, SHA-256 proposal binding, human-only approval, single-transaction execution, idempotency keys, one payment per invoice, redacted audit log.
-- **Agent:** bounded tool loop (8 tool calls, 10 model requests, 2 transient retries, token budget); the task pauses at `AWAITING_APPROVAL`; no model-callable approval.
-- **Invoice input:** manual entry, a synthetic example, pasted text and text-based PDFs (no OCR). Extracted fields are a draft; ambiguity is never guessed.
+```bash
+npm run typecheck
+npm test
+npm run test:e2e    # needs system Google Chrome
+npm run eval        # 30 fixed cases on the sandbox
+```
 
-## Known limits
+Real-model checks are recorded in `docs/LIVE_SMOKE_RESULT.md`. They are partial: one scripted run passed, one failed and was fixed, and the manual pass with a real invoice is not done.
 
-Simulated payments only; one currency pair; no real provider integration; no OCR; English plus one tested Russian instruction; no student interviews yet; live model unverified; no KYC/AML; local-demo security posture (loopback HTTP, documented demo credentials). Open organizer questions (rubric, AI-disclosure, final format, inference provider, registration channel) are listed in `docs/PROJECT_SPEC.md` and `SUBMISSION_CHECKLIST.md`.
+## More
+
+- `docs/ARCHITECTURE.md` and `docs/SECURITY.md`: how it works and how it is protected
+- `docs/DEPENDENCIES.md`: dependency licenses
+- `AI_USAGE.md`: how AI was used, in development and at run time
+- `docs/deck/`: the presentation and its editable source

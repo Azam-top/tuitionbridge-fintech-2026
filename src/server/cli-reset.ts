@@ -1,13 +1,10 @@
+// Resets the SANDBOX test dataset (never the live database).  npm run reset-demo
 import { loadConfig } from "./config.js";
 import { openDb } from "./db.js";
 import { systemClock } from "./clock.js";
 import { resetDemo } from "./services/seed.js";
 
-const config = loadConfig();
-if (!config.demoMode) {
-  console.error("Refusing to reset: APP_DEMO_MODE=0.");
-  process.exit(1);
-}
-const db = openDb(config.dbPath);
+const config = loadConfig({ ...process.env, APP_MODE: "sandbox" });
+const db = openDb(config.dbPath, "sandbox");
 resetDemo({ db, clock: systemClock, config });
-console.log(`Demo dataset reset at ${config.dbPath}. Users: alice@demo.local / bob@demo.local (see README).`);
+console.log(`SANDBOX test dataset reset at ${config.dbPath}. Test users: alice@demo.local / bob@demo.local (fictional data).`);

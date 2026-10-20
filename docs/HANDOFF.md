@@ -1,31 +1,47 @@
-# Handoff (end of Session 2)
+# Handoff (live mode and sandbox, updated 2026-10-20)
 
 ## State
-Session 1 core + Session 2 deliverables are built and verified locally. Agent is MOCK by default; payments always SIMULATED. **Not competition-ready until the human items below are done.**
+The app now has two separate modes. **LIVE** (default): real accounts, your own invoice, a real model is required (no stand-in; `APP_LLM_PROVIDER=groq` or `anthropic`, no automatic fallback to another provider or the MOCK agent), payment options only from named sources (Wise public quote API, offers you type with source and time, NBK reference rate), and the app **moves no money**: it issues a payment instruction and stores your own evidence. **SANDBOX**: a separate stamped database of fictional TEST DATA with the MOCK agent and a SIMULATED ledger, used for the competition check and the 30 evaluation cases. See README for the table.
 
-## Verified this session (measured; see artifacts/evidence/test-summary.json, eval-mock.json)
-- Type check pass; 102 unit/integration tests pass; 14 Playwright browser tests pass (system Chrome); production build pass.
-- Deterministic evaluation: 30/30 cases, 12/12 critical gates, 0 unauthorized payments (MOCK + scripted drivers; says nothing about a real model).
-- Evaluation and test controls were manually broken one at a time (11 runs): 9 caught at once, 1 needed an added test, 1 equivalent mutant (approval owner filter is defense-in-depth).
-- Package built from an allowlist with a secret scan (scanner verified against a planted key); extracted into a clean directory: `npm ci`, typecheck, tests, build, eval, e2e and server start all pass. (That check found and fixed a real defect: concurrency tests needed `data/` to exist.)
+## Measured results (source commit `bcf833e841200ec8795e1d9a7484b80049f0428b`, clean tree, Node v26.11.1)
+From `artifacts/evidence/test-summary.json`, `eval-mock.json`, `manifest.json`, all at that one source commit (regenerated 2026-10-20 on the clean tree; the later commit adds artifacts and docs only, and `npm run package` refuses unless the artifacts share one clean source commit and sources did not change since). The source commit adds, on top of the dark redesign (`d47c1e1`) and the Groq adapter (`b4e1ecd`), the ordinary-user planning flow (see "Ordinary-user flow" below).
+- Type check pass; unit/integration **231/231** (18 files); browser **30/30** (21 sandbox + 9 live, the live ones with a LOCAL FAKE model); production build pass.
+- Deterministic evaluation on the **sandbox**: **30/30**, critical **12/12**, unauthorized payments **0**, gate PASS (MOCK + scripted drivers; says nothing about a real model).
+- Demo video re-recorded at the same source commit on the new interface (2 min 44 s, captions only; in the live segment the server fetched real Wise quotes by itself when "Plan my payment" was pressed): LIVE segment with the local fake model and the real NBK/Wise sources, then the sandbox. The final presentation (10 slides, 16:9, dark style; `docs/deck/TuitionBridge_Presentation.pdf`, editable `docs/deck/index.html`, plain-English speaker notes and a Russian summary in `docs/deck/`), screenshots, evidence viewer and `docs/DEPENDENCIES.md` are regenerated. Its numbers are read from the evidence reports at build time, and the build fails if `docs/LIVE_SMOKE_RESULT.md` no longer contains the figures it quotes. It says plainly that no interviews were run, that Gemini is only planned, and that the real-model checks are partial.
+- **Real-model smoke, two runs, one script each, no payment, synthetic student (see `docs/LIVE_SMOKE_RESULT.md`):**
+  - **Run 1: PASS** (Groq `openai/gpt-oss-120b`, 2026-10-19 11:02 UTC, sources `b4e1ecd510b751be4f714ddf838d3a3efaa30f37`): 5 tool calls, 6 requests, 0 retries, 9,296 in / 553 out tokens, 50.7 s of model time; plan confirmed by the script.
+  - **Run 2: NOT PASSED** on the packaged sources (`bb99c9eac52fb2654fe6641e3baa1b265bff24d6`, run at commit `6c0d5b28e132b771df9ec60584a5cc5598cb2377`, 2026-10-20 11:57 UTC): the state was `BLOCKED` because Wise's quote could not be reproduced to the cent (Wise shows the rate rounded to 3 decimals, which makes the app's total 1 cent higher than Wise's), so every Wise option was dropped and `get_quotes` returned `NO_OFFERS`. 3 tool calls, 4 requests, 0 retries, 4,920 in / 429 out tokens, 1.9 s of model time. The model invented nothing. Nothing was changed because the sources were frozen; a fix (accepting a 1-cent rounding difference) is a decision about a money-verification rule.
+  - So: no real-model run has passed on the packaged sources, and the new system prompt has not been exercised through a proposal.
+- **Not confirmed by that run:** the five-case live evaluation (`eval:live`, no `eval-live.json`), and a manual pass in the browser with a real invoice and a real model. **The LIVE mode is not fully verified.**
+
+## Changes since the smoke runs (2026-10-20)
+1. **Wise amounts (`f94f3a0`):** each Wise option stores Wise's own total, fee and recipient amount as exact minor units and every later step uses them (no rebuild from the rounded rate, no tolerance). Verified without a model: a regression on the rounding case, exact-conversion, hash-binding, tamper and exclusion tests, and one fresh real Wise response taken through the whole path (`npm run check:sources`). This is the fix for smoke run 2.
+2. **Final interface copy pass (`f7f4762`):** plain wording on the main screens, compact Wise offer cards, one recommendation with a concrete reason, sources and technical origin in closed Details, "Continue on Wise" with "Complete your payment on Wise". Screens: `docs/ui-screens/`.
+3. **Still true:** no real-model run has passed on these sources; the manual pass with a real invoice is not done (`docs/MANUAL_PASS.md`); the five-case live evaluation was not run; the LIVE mode is not fully verified.
+
+## Ordinary-user flow (changed 2026-10-20; wording refined by the copy pass)
+- The live screens show no mode/agent badges, model name or token counters; mode, model and run limits sit in the collapsed "Technical details" section (the sandbox keeps its labels). "Setup required" stays visible when no model is configured.
+- "Plan my payment": the server fetches current Wise quotes (and the NBK reference) before the assistant runs; manual bank offers are optional. With Wise switched off and no offer the planner says so and does not start.
+- One effective reserve: the plan's own (what the server read), otherwise a preview of the settings next to the button. The saved default is shown separately and only as "Saved default".
+- Failures (model, Wise, safety limit) show a plain reason and Try again (and "Add an offer from your bank" for Wise problems). No MOCK fallback in the live mode.
+- "Continue on Wise" opens the fixed address `https://wise.com/` (a constant) next to "Complete your payment on Wise", only for an unexpired instruction built from a Wise quote. The instruction says "Not paid yet"; a user's mark or attached file is shown as "not confirmed by a bank".
+- Screens: `docs/ui-screens/05-13`. Not verified with a real model: this whole flow ran only with the local fake model (and real Wise in the recording).
+
+## What is real and verified
+- **NBK reference rate** and **Wise public quote** (USD→KZT, KZT 500,000): fetched for real on 2026-10-18 by the app's own code (`npm run check:sources`). (Changed 2026-10-20: the app stores each Wise option's own total, fee and recipient amount exactly; it no longer rebuilds them from the rate.) Recorded copies are in `tests/fixtures/*.recorded-2026-10-18.*` and are the only "real data" inputs in the tests.
+- **Live flow in the browser** (register → funds → attested recipient → invoice → offer → plan → approve → instruction → user evidence) runs against the real Anthropic adapter, but with a **LOCAL FAKE provider** as the model (`e2e/fake-provider.ts`). That verifies the app, not a model. The Groq adapter's tool-calling cycle is tested the same way (`tests/groq-adapter.test.ts`, fake provider) and was exercised once against the real Groq API by the smoke run above.
+- **Ordinary-interface path, checked 2026-10-20 without any paid call:** own invoice → confirm the fields → declared balance and reserve → live Wise offers → plan → your own approval → instruction. Seen in the browser (the demo recording and a debug run of it: real Wise returned three `PROVIDER_LIVE` offers in the new interface) and covered by the 26 browser tests and `tests/live-mode.test.ts` / `tests/groq-adapter.test.ts`: the live database starts with no demo users or numbers; without a working model the live mode shows "Setup required" or a visible FAILED task, never the MOCK agent or another provider; an expired offer cannot become an instruction. Run with the fake model, so it checks the app, not a model.
+- **Real model, one run:** see the smoke result above. The invoice-to-instruction path with the real model was run only through the script (synthetic data); nobody has yet done it by hand in the browser with a real invoice.
+
+## What is NOT done
+- **Wise rounding gap (found 2026-10-20):** the strict arithmetic check can drop all Wise options when Wise's displayed rate is rounded (see run 2). The workaround is a manual bank offer; the fix needs a decision.
+- **Full real-model verification: not done.** The five-case pack needs your decision to spend tokens: `APP_EVAL_LIVE=1 npm run eval:live` (see `docs/LIVE_RUN.md`). A manual browser pass with your real invoice is also open. The in-app "Go to the provider" step is text only: the instruction card tells you to open Wise (or the channel that gave the offer) yourself; there is no link or redirect.
+- **Real payment execution through a provider: not implemented.** Wise's documentation says a personal API token belongs to a Wise business account and exposes a subset of the API; whether it can create and fund USD→KZT transfers is unverified. Until access is confirmed the live mode issues an instruction and accepts user evidence. A manual mark or uploaded file is never called bank confirmation.
+- Wise's public quote is indicative (`guaranteedTargetAmount: false`) and its endpoint is documented for Wise affiliate partners; read Wise's terms before relying on it (`APP_WISE_QUOTES=0` switches it off).
+- No student interviews; no full human code review documented (`AI_USAGE.md` says so); no narrated rehearsal; Node 24 not run; organizer questions open (see SUBMISSION_CHECKLIST.md).
 
 ## Commands
-`npm run build && npm run start` · `npm run typecheck|test|test:e2e|eval|evidence|deck|demo:capture|test:summary|licenses|package` · `npm run smoke:live` and `APP_EVAL_LIVE=1 npm run eval:live -- --max-cases=6` (need a key; spend credits; NOT run).
-
-## Deliverable paths
-README.md · docs/{ARCHITECTURE,SECURITY,PROJECT_SPEC,DEMO_SCRIPT,PITCH_QA,DEPENDENCIES}.md · AI_USAGE.md · SUBMISSION_CHECKLIST.md · docs/deck/{index.html, TuitionBridge_pitch.pdf, TuitionBridge_pitch_with_notes.pdf} · artifacts/evidence/{viewer.html, success-run.json, malicious-case.json, eval-mock.json, test-summary.json, manifest.json} · artifacts/demo/tuitionbridge-demo-mock.mp4 (1:40, captions, no narration; .webm master is git-ignored from the package) · dist-submission/ (zip + tar.gz, git-ignored).
-
-## Decisions
-UI: guided demo (4 scenarios + more datasets), stepper, friendly errors, approval card focus. Login rate limit configurable (`APP_LOGIN_RATE_LIMIT`; e2e raises it). Deck numbers come from measured files and the policy code. Evidence = real runs read back from the DB (MOCK), plus a labeled REPLAY viewer.
-
-## Remaining human blockers (details in SUBMISSION_CHECKLIST.md)
-1. **LIVE model never run**: set key+model in `.env`, `npm run smoke:live`, then the bounded live eval; re-export evidence/deck.
-2. No student interviews (deck slides 2 and 10 have TODOs).
-3. AI_USAGE.md human-review section is blank; the team must read and understand money math, approval gate, tool loop, ledger transaction.
-4. Narrated rehearsal not done; video is captions-only, MOCK.
-5. Organizer questions unanswered: governing rubric, AI-code disclosure, final format/recording allowed, venue inference provider, under-18 rules, registration/submission channel (IEEE vs CMU emails differ).
-6. Repository URL placeholder; project license not chosen; Node 24 and a teammate's machine untested.
-7. Submit by 19 Oct; hard deadline 20 Oct 23:59 Beijing (20:59 Almaty).
+`npm run build && npm run start` (live) · `npm run start:sandbox` · `npm run check:sources` · `npm run typecheck|test|test:e2e|eval|evidence|demo:capture|deck|licenses|package|test:summary` · `npm run smoke:live` (your key; spends credits; provider from `APP_LLM_PROVIDER`).
 
 ## If resuming
-Re-run `npm run test:summary && npm run eval && npm run evidence && npm run deck && npm run package` after any change; do not edit evidence by hand.
+After any source change: commit, then on the clean tree (leave `APP_LLM_API_KEY=` empty in the shell so no paid call can happen) `npm run build && npm run test:summary && npm run evidence && npm run demo:capture && npm run deck && npm run licenses`, commit the artifacts, then `npm run package` (it refuses unless artifacts trace to one clean source commit). Do not edit evidence by hand.

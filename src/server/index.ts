@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { loadConfig, agentMode } from "./config.js";
+import { loadConfig, agentStatus } from "./config.js";
 import { openDb } from "./db.js";
 import { systemClock } from "./clock.js";
 import { createLlm } from "./agent/factory.js";
@@ -12,20 +12,28 @@ if (existsSync(".env")) process.loadEnvFile(".env");
 const config = loadConfig();
 const loopback = ["127.0.0.1", "::1", "localhost"];
 if (!loopback.includes(config.host) && process.env.APP_ALLOW_REMOTE !== "1") {
-  console.error(`Refusing to bind ${config.host}: this demo binds to loopback only. Set APP_ALLOW_REMOTE=1 to override (not recommended).`);
+  console.error(`Refusing to bind ${config.host}: this app binds to loopback only. Set APP_ALLOW_REMOTE=1 to override (not recommended).`);
   process.exit(1);
 }
-const db = openDb(config.dbPath);
+// The database file is stamped with its mode; opening a live file in sandbox mode (or the reverse) is refused.
+const db = openDb(config.dbPath, config.appMode);
 const ctx = { db, clock: systemClock, config };
-const hasUsers = (db.prepare("SELECT COUNT(*) c FROM users").get() as { c: number }).c > 0;
-if (!hasUsers) {
-  resetDemo(ctx);
-  console.log("Seeded synthetic demo dataset.");
+if (config.appMode === "sandbox") {
+  const hasUsers = (db.prepare("SELECT COUNT(*) c FROM users").get() as { c: number }).c > 0;
+  if (!hasUsers) {
+    resetDemo(ctx);
+    console.log("Seeded the SANDBOX test dataset (fictional university, providers and users).");
+  }
 }
 const llm = createLlm(config);
 const runner = createRunner(ctx, llm);
 runner.recoverInterrupted();
 const app = buildApp({ ctx, runner, llm });
 await app.listen({ host: config.host, port: config.port });
-console.log(`TuitionBridge on http://${config.host}:${config.port}  agent=${agentMode(config)}  payments=SIMULATED${config.demoMode ? "  demo=on" : ""}`);
-if (agentMode(config) === "MOCK") console.log("No APP_LLM_API_KEY/APP_LLM_MODEL set: using the deterministic MOCK agent (not a live model run).");
+const agent = agentStatus(config);
+console.log(`TuitionBridge on http://${config.host}:${config.port}  mode=${config.appMode.toUpperCase()}  agent=${agent}  db=${config.dbPath}`);
+if (config.appMode === "sandbox") console.log("SANDBOX: test data only; payments are SIMULATED. This is not the real application mode.");
+if (config.llmProvider === "unsupported") console.log("SETUP REQUIRED: APP_LLM_PROVIDER must be \"anthropic\" or \"groq\".");
+else if (agent === "NOT_CONFIGURED") console.log("SETUP REQUIRED: set APP_LLM_PROVIDER, APP_LLM_API_KEY and APP_LLM_MODEL in .env. The live mode has no stand-in agent.");
+else if (agent === "LIVE") console.log(`Model provider: ${config.llmProvider}, model: ${config.llmModel}.`);
+if (agent === "MOCK") console.log("Sandbox agent is the deterministic MOCK stand-in (not a live model).");

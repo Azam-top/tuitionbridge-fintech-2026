@@ -4,6 +4,7 @@ import { newId } from "../ids.js";
 import { PolicyError } from "../errors.js";
 import { audit } from "./audit.js";
 import { parseMinor } from "../../shared/money.js";
+import { linkRecipientByAccount } from "./recipients.js";
 
 export interface InvoiceRow {
   id: string;
@@ -17,7 +18,7 @@ export interface InvoiceRow {
   source_type: string;
   notes: string;
   ambiguous_fields: string;
-  status: "DRAFT" | "BLOCKED" | "CONFIRMED" | "PAID";
+  status: "DRAFT" | "BLOCKED" | "CONFIRMED" | "INSTRUCTED" | "PAID";
   issues_json: string;
   created_at: string;
   confirmed_at: string | null;
@@ -55,7 +56,7 @@ export const toView = (r: InvoiceRow): InvoiceView => ({
 const text = (max: number) => z.string().trim().min(1).max(max);
 export const InvoiceInput = z.object({
   reference: text(64),
-  recipientRegistryId: text(64),
+  recipientRegistryId: z.string().trim().max(64), // may be empty in the live mode: it is linked from the user's attested recipients
   beneficiaryName: text(200),
   beneficiaryAccount: text(64),
   amountKztTiyn: z.string().regex(/^\d{1,15}$/),
@@ -77,6 +78,7 @@ export function validateInvoice(ctx: Ctx, r: InvoiceRow): Issue[] {
     ["beneficiary_account", "beneficiaryAccount"], ["amount_kzt_tiyn", "amountKztTiyn"], ["due_at", "dueAt"],
   ];
   for (const [col, field] of req) {
+    if (col === "recipient_registry_id" && ctx.config.appMode === "live") continue; // reported as UNKNOWN_RECIPIENT below
     if (!String(r[col] ?? "").trim()) issues.push({ code: "MISSING_FIELD", field, message: `${field} is missing.` });
   }
   for (const f of JSON.parse(r.ambiguous_fields) as string[]) {
@@ -90,10 +92,15 @@ export function validateInvoice(ctx: Ctx, r: InvoiceRow): Issue[] {
   if (Date.parse(r.due_at) <= ctx.clock.now().getTime()) {
     issues.push({ code: "DUE_PASSED", field: "dueAt", message: "The due date has already passed." });
   }
-  const trusted = ctx.db.prepare("SELECT name, account FROM trusted_recipients WHERE registry_id = ?").get(r.recipient_registry_id) as
+  const trusted = ctx.db.prepare("SELECT name, account FROM trusted_recipients WHERE registry_id = ? AND (owner_user_id IS NULL OR owner_user_id = ?)").get(r.recipient_registry_id, r.owner_user_id) as
     | { name: string; account: string } | undefined;
   if (!trusted) {
-    issues.push({ code: "UNKNOWN_RECIPIENT", field: "recipientRegistryId", message: "This recipient registry ID is not in the trusted registry." });
+    issues.push({
+      code: "UNKNOWN_RECIPIENT", field: "recipientRegistryId",
+      message: ctx.config.appMode === "live"
+        ? "This beneficiary is not one of your attested recipients. Add it first from the university's official payment page (name, account and the page's address); an invoice cannot add it."
+        : "This recipient registry ID is not in the trusted registry.",
+    });
   } else if (norm(trusted.name) !== norm(r.beneficiary_name) || normAcct(trusted.account) !== normAcct(r.beneficiary_account)) {
     issues.push({
       code: "RECIPIENT_MISMATCH",
@@ -133,7 +140,7 @@ export function createInvoice(ctx: Ctx, ownerId: string, raw: unknown): InvoiceV
 export function updateInvoice(ctx: Ctx, ownerId: string, id: string, raw: unknown): InvoiceView {
   const patch = parseInput(InvoicePatch, raw);
   const cur = getInvoice(ctx, ownerId, id);
-  if (cur.status === "PAID") throw new PolicyError("INVOICE_ALREADY_PAID", "A paid invoice cannot be edited.");
+  if (cur.status === "PAID" || cur.status === "INSTRUCTED") throw new PolicyError("INVOICE_ALREADY_PAID", "An invoice with a payment instruction or a payment cannot be edited.");
   const ambiguous = new Set(JSON.parse(cur.ambiguous_fields) as string[]);
   const fieldOfKey: Record<string, string> = {
     reference: "reference", recipientRegistryId: "recipientRegistryId", beneficiaryName: "beneficiaryName",
@@ -163,8 +170,10 @@ export function updateInvoice(ctx: Ctx, ownerId: string, id: string, raw: unknow
 
 /** Human confirmation. Revalidates; blocked state is recoverable by editing and confirming again. */
 export function confirmInvoice(ctx: Ctx, ownerId: string, id: string): InvoiceView {
-  const cur = getInvoice(ctx, ownerId, id);
-  if (cur.status === "PAID") throw new PolicyError("INVOICE_ALREADY_PAID", "Invoice is already paid.");
+  let cur = getInvoice(ctx, ownerId, id);
+  if (cur.status === "PAID" || cur.status === "INSTRUCTED") throw new PolicyError("INVOICE_ALREADY_PAID", "A payment instruction was already issued for this invoice.");
+  linkRecipientByAccount(ctx, ownerId, id);
+  cur = getInvoice(ctx, ownerId, id);
   const issues = validateInvoice(ctx, cur);
   const status = issues.length ? "BLOCKED" : "CONFIRMED";
   ctx.db.prepare("UPDATE invoices SET status=?, issues_json=?, confirmed_at=? WHERE id=? AND owner_user_id=?").run(
@@ -180,7 +189,9 @@ export function confirmInvoice(ctx: Ctx, ownerId: string, id: string): InvoiceVi
 export function parseInput<T extends z.ZodTypeAny>(schema: T, raw: unknown): z.infer<T> {
   const r = schema.safeParse(raw);
   if (!r.success) {
-    throw new PolicyError("VALIDATION", "Invalid input.", { issues: r.error.issues.map((i) => ({ path: i.path.join("."), message: i.message })) });
+    const issues = r.error.issues.map((i) => ({ path: i.path.join("."), message: i.message }));
+    // Say which field and why, so the user can fix it (field names and messages are our own, never user text).
+    throw new PolicyError("VALIDATION", `Invalid input: ${issues.slice(0, 3).map((i) => (i.path ? `${i.path}: ` : "") + i.message).join("; ")}`, { issues });
   }
   return r.data;
 }

@@ -2,7 +2,6 @@
 // Nothing here is scripted dialogue or a static screenshot: each record is read back from the database after the run.
 //   npm run evidence
 import { createHash } from "node:crypto";
-import { execFileSync } from "node:child_process";
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { openDb } from "../src/server/db";
@@ -18,8 +17,12 @@ import { MockLlm } from "../src/server/agent/mock-llm";
 import { PolicyError } from "../src/server/errors";
 import type { ScenarioId } from "../src/server/fixtures";
 import { Scripted, turn } from "./eval/harness";
+import { assessLiveReport, copyInto, gitInfo, runMandatoryEval } from "./lib/provenance";
 
 const OUT = "artifacts/evidence";
+// The deterministic evaluation is mandatory. If it fails, or does not produce a fresh passing report, nothing is exported
+// and the command exits non-zero (the uncaught error below), so an old eval-mock.json can never pass as a new run.
+const evalRun = runMandatoryEval({ expectCases: 30 });
 mkdirSync(OUT, { recursive: true });
 const ALICE = "usr_alice";
 const EN = "Pay this invoice by its deadline, use the cheapest feasible route, and keep USD 300 for living costs.";
@@ -108,27 +111,32 @@ const malicious = {
 };
 if (!malicious.paymentLedgerUnchanged) throw new Error("Evidence check failed: payment ledger changed in the malicious case.");
 
-// ---------- 3. evaluation (fresh deterministic run) ----------
-try { execFileSync("npx", ["tsx", "scripts/eval/run.ts"], { stdio: "ignore" }); } catch { /* the report is still written; thresholds are shown in it */ }
+// ---------- 3. evaluation: the fresh report validated at the top of this script ----------
+copyInto(evalRun.reportPath, OUT, "eval-mock.json");
 
-const gitHead = (() => { try { return execFileSync("git", ["rev-parse", "--short", "HEAD"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim(); } catch { return null; } })();
+const git = gitInfo();
+const gitHead = git.short;
+if (git.dirty) console.warn("WARNING: source files have uncommitted changes; this evidence is recorded as sourceDirty=true and is not reproducible from a commit.");
 const generatedAt = new Date().toISOString();
 writeFileSync(join(OUT, "success-run.json"), JSON.stringify(success, null, 2) + "\n");
 writeFileSync(join(OUT, "malicious-case.json"), JSON.stringify(malicious, null, 2) + "\n");
 
 const files = readdirSync(OUT).filter((f) => f.endsWith(".json") && f !== "manifest.json").sort();
+const liveRaw = (() => { try { return JSON.parse(readFileSync(join(OUT, "eval-live.json"), "utf8")) as unknown; } catch { return null; } })();
+const liveAssessment = assessLiveReport(liveRaw);
 const manifest = {
   kind: "TuitionBridge evidence bundle",
-  generatedAt, gitHead, node: process.version,
-  labels: { agentMode: "MOCK (no model key configured for these runs)", payments: "SIMULATED", viewer: "REPLAY (offline record of the runs below)", liveModelVerified: false },
+  generatedAt, gitHead, sourceCommit: git.head, sourceDirty: git.dirty, node: process.version,
+  note: "sourceCommit is the commit the sources were at when these runs were made; a later commit may only add these artifacts.",
+  labels: { mode: "SANDBOX (fictional test data; not the live mode)", agentMode: "MOCK (no model key configured for these runs)", payments: "SIMULATED", viewer: "REPLAY (offline record of the runs below)", liveModelVerified: liveAssessment.status === "VERIFIED" },
+  liveEvaluation: { status: liveAssessment.status, reasons: liveAssessment.reasons },
   redaction: "Contains no credentials, session/CSRF tokens, password hashes or API keys. All names, accounts and amounts are fictional. Token usage/cost are not reported for MOCK runs.",
   files: files.map((f) => ({ file: f, sha256: createHash("sha256").update(readFileSync(join(OUT, f))).digest("hex") })),
 };
 writeFileSync(join(OUT, "manifest.json"), JSON.stringify(manifest, null, 2) + "\n");
 
 const evalMock = JSON.parse(readFileSync(join(OUT, "eval-mock.json"), "utf8")) as unknown;
-const liveReport = (() => { try { return JSON.parse(readFileSync(join(OUT, "eval-live.json"), "utf8")) as unknown; } catch { return null; } })();
-const data = { manifest, success, malicious, evalMock, evalLive: liveReport };
+const data = { manifest, success, malicious, evalMock, evalLive: liveAssessment.status === "VERIFIED" ? liveRaw : null, liveAssessment };
 const html = readFileSync("scripts/evidence-viewer.template.html", "utf8").replace("/*__DATA__*/null", JSON.stringify(data).replace(/</g, "\\u003c"));
 writeFileSync(join(OUT, "viewer.html"), html);
 console.log(`Evidence written to ${OUT}/ (${files.length} JSON files + viewer.html). Open ${OUT}/viewer.html offline.`);

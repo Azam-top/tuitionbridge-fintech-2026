@@ -10,19 +10,35 @@ interface QuoteRow {
   id: string; owner_user_id: string; invoice_id: string; provider_id: string; provider_name: string; version: number;
   src_ccy: string; dst_ccy: string; rate: string; fee_cents: string; min_kzt_tiyn: string; max_kzt_tiyn: string;
   issued_at: string; expires_at: string; est_arrival_at: string; eligible: number; ineligible_reason: string | null; provenance: string;
+  source_note: string | null; observed_at: string | null; external_ref: string | null;
+  provider_source_cents?: string | null; provider_target_tiyn?: string | null;
 }
 
 export const rowToQuote = (r: QuoteRow): QuoteRecord => ({
   id: r.id, providerId: r.provider_id, providerName: r.provider_name, version: r.version, srcCcy: r.src_ccy, dstCcy: r.dst_ccy,
   rate: r.rate, feeCents: r.fee_cents, minKztTiyn: r.min_kzt_tiyn, maxKztTiyn: r.max_kzt_tiyn, issuedAt: r.issued_at,
   expiresAt: r.expires_at, estArrivalAt: r.est_arrival_at, eligible: r.eligible === 1, ineligibleReason: r.ineligible_reason,
-  provenance: r.provenance,
+  provenance: r.provenance, sourceNote: r.source_note, observedAt: r.observed_at, externalRef: r.external_ref,
+  providerAmounts: r.provider_source_cents && r.provider_target_tiyn ? { sourceTotalCents: r.provider_source_cents, targetTiyn: r.provider_target_tiyn } : null,
 });
 
 export function getQuote(ctx: Ctx, ownerId: string, quoteId: string): QuoteRecord {
   const r = ctx.db.prepare("SELECT * FROM quotes WHERE id = ? AND owner_user_id = ?").get(quoteId, ownerId) as QuoteRow | undefined;
   if (!r) throw new PolicyError("NOT_FOUND", "Quote not found.");
   return rowToQuote(r);
+}
+
+/** The current quote set: the highest version per provider issued for this invoice. */
+export function latestQuotesForInvoice(ctx: Ctx, ownerId: string, invoiceId: string): QuoteRecord[] {
+  const rows = ctx.db.prepare(
+    "SELECT * FROM quotes WHERE owner_user_id = ? AND invoice_id = ? ORDER BY provider_id, version DESC",
+  ).all(ownerId, invoiceId) as QuoteRow[];
+  const seen = new Set<string>();
+  const out: QuoteRecord[] = [];
+  for (const r of rows) {
+    if (!seen.has(r.provider_id)) { seen.add(r.provider_id); out.push(rowToQuote(r)); }
+  }
+  return out;
 }
 
 /**

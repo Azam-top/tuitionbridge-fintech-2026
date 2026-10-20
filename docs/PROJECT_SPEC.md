@@ -1,10 +1,10 @@
 # TuitionBridge: project spec (Session 1 contract)
 
 Competition prototype for Topic C, 2026 Shenzhen International FinTech Competition, International Track.
-All data is fictional. All payments are SIMULATED in a local sandbox ledger.
+Two modes. LIVE (default): real accounts, real invoice, a required real model, sources named per number; the app moves NO money and issues a payment instruction. SANDBOX: a separate stamped database of fictional TEST DATA with a MOCK agent and a SIMULATED ledger, used for the competition check and the 30 evaluation cases.
 
 ## Task
-Confirmed invoice -> balances -> three sandbox USD->KZT quotes -> feasible route -> immutable proposal -> explicit human approval -> agent-executed sandbox payment -> receipt + redacted evidence.
+Confirmed invoice -> declared funds -> sourced USD->KZT offers (Wise public quote API, user-entered offers, NBK reference rate) -> server-ranked feasible route -> immutable proposal -> explicit human approval -> payment instruction (live) or sandbox ledger execution (sandbox) -> user evidence / receipt + audit log.
 
 ## Competition facts (from the organizer brief; not scoring promises)
 - International Track rubric: task completion 40%, security/compliance 30%, innovation/interaction 30%.
@@ -42,7 +42,7 @@ Confirmed invoice -> balances -> three sandbox USD->KZT quotes -> feasible route
 - Tools: parse_invoice, get_balances, get_quotes, evaluate_routes, prepare_payment, execute_sandbox_payment.
 - Persisted task states: RUNNING -> AWAITING_APPROVAL -> EXECUTING -> COMPLETED | BLOCKED | FAILED | CANCELLED.
 - Limits per task (across both phases): 8 tool calls, 10 model requests, 2 transient retries, token budget, tool timeouts. One active task per user. Hitting a limit fails visibly.
-- Modes shown in the UI: agent LIVE or MOCK, payment always SIMULATED, REPLAY for offline records. MOCK is never presented as a verified live run.
+- Modes: the sandbox always shows agent MOCK and payments SIMULATED; the live mode shows them in a collapsed "Technical details" section, and shows "Setup required" in the main screen when no model is configured. REPLAY for offline records. MOCK is never presented as a verified live run.
 
 ## Phase gates
 - Session 1 gate: core flow persists a real sandbox ledger change after human approval; deterministic financial/security tests + browser flow pass; typecheck + build pass; a real provider adapter exists; live status recorded honestly.

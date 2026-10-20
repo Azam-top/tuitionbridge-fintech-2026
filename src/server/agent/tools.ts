@@ -4,7 +4,7 @@ import type { Tier } from "../auth.js";
 import { PolicyError } from "../errors.js";
 import { getInvoice, validateInvoice } from "../services/invoices.js";
 import { getBalances } from "../services/ledger.js";
-import { issueQuotes, rowToQuote } from "../services/quotes.js";
+import { issueQuotes, latestQuotesForInvoice, rowToQuote } from "../services/quotes.js";
 import { prepareProposal, proposalView, getApprovalForProposal } from "../services/proposals.js";
 import { executePayment } from "../services/execution.js";
 import { evaluateRoutes, type Preference, type QuoteRecord } from "../../shared/policy.js";
@@ -26,12 +26,12 @@ export const TOOL_SPECS: Record<ToolName, ToolSpec> = {
   },
   get_balances: {
     name: "get_balances",
-    description: "Return the student's USD and KZT balances and USD living-expense reserve, in minor units (cents / tiyn) with formatted strings. Currencies are never summed.",
+    description: "Return the student's USD and KZT balances and USD living-expense reserve, in minor units (cents / tiyn) with formatted strings. In the live mode these are declared by the student, not read from a bank. Currencies are never summed.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   },
   get_quotes: {
     name: "get_quotes",
-    description: "Request fresh SIMULATED USD->KZT quotes from the three sandbox providers for the confirmed invoice. Quotes expire quickly; arrival times are estimates.",
+    description: "Return the current USD->KZT quotes for the confirmed invoice. Each quote states its source: sandbox test data, a provider API, or an offer the student entered by hand. Quotes expire; arrival times are estimates.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   },
   evaluate_routes: {
@@ -51,7 +51,7 @@ export const TOOL_SPECS: Record<ToolName, ToolSpec> = {
   prepare_payment: {
     name: "prepare_payment",
     description:
-      "Create an immutable payment proposal for one feasible quote_id from the latest evaluate_routes result. This does NOT move money. A human must approve it afterwards.",
+      "Create an immutable payment proposal for one feasible quote_id from the latest evaluate_routes result. The server re-ranks the current quotes and rejects any quote that is not the best route for the stated preference. This does NOT move money. A human must approve it afterwards.",
     inputSchema: {
       type: "object",
       properties: {
@@ -103,6 +103,8 @@ export interface ToolOutcome {
 const fail = (code: string, message: string, extra: Record<string, unknown> = {}): ToolOutcome => ({ ok: false, data: { error: { code, message, ...extra } } });
 
 function latestQuotes(env: ToolEnv): QuoteRecord[] {
+  // Live mode: every current offer the student or a provider API supplied (expired ones are excluded by the policy, not hidden).
+  if (env.ctx.config.appMode === "live") return latestQuotesForInvoice(env.ctx, env.ownerId, env.invoiceId);
   const rows = env.ctx.db.prepare(
     "SELECT * FROM quotes WHERE owner_user_id = ? AND invoice_id = ? AND issued_at >= ? ORDER BY provider_id, version DESC",
   ).all(env.ownerId, env.invoiceId, env.taskCreatedAt) as never[];
@@ -147,8 +149,21 @@ export function runTool(env: ToolEnv, name: string, rawInput: unknown): ToolOutc
       }
       case "get_quotes": {
         empty.parse(rawInput ?? {});
-        const quotes = issueQuotes(env.ctx, env.ownerId, env.invoiceId);
-        return { ok: true, data: { provenance: "SIMULATED", quotes: quotes.map((q) => ({ quoteId: q.id, provider: q.providerName, rate: q.rate, feeCents: q.feeCents, estArrivalAt: q.estArrivalAt, expiresAt: q.expiresAt })) } };
+        const live = env.ctx.config.appMode === "live";
+        // Sandbox: issue labeled test quotes. Live: only what stored sources supplied; never invented.
+        const all = live ? latestQuotesForInvoice(env.ctx, env.ownerId, env.invoiceId) : issueQuotes(env.ctx, env.ownerId, env.invoiceId);
+        const now = env.ctx.clock.now().getTime();
+        const quotes = live ? all.filter((q) => Date.parse(q.expiresAt) > now) : all;
+        if (!quotes.length) return fail("NO_OFFERS", "There are no current offers for this invoice. The student must fetch a provider quote or enter an offer from a bank or provider.");
+        return {
+          ok: true,
+          data: {
+            quotes: quotes.map((q) => ({
+              quoteId: q.id, provider: q.providerName, rate: q.rate, feeCents: q.feeCents, estArrivalAt: q.estArrivalAt, expiresAt: q.expiresAt,
+              source: q.provenance, sourceNote: q.sourceNote ?? null, observedAt: q.observedAt ?? null,
+            })),
+          },
+        };
       }
       case "evaluate_routes": {
         const a = z.object({ preference: preferenceArg, reserve_usd_cents: reserveArg }).strict().parse(rawInput);
@@ -167,7 +182,7 @@ export function runTool(env: ToolEnv, name: string, rawInput: unknown): ToolOutc
           data: {
             preference: pref, reserveUsdCents: a.reserve_usd_cents, bestQuoteId: res.best?.quoteId ?? null, noFeasibleRoute: res.best === null,
             routes: res.routes.map((r) => ({
-              quoteId: r.quoteId, provider: r.providerName, feasible: r.feasible, totalDebit: formatUsd(r.totalDebitCents), totalDebitCents: r.totalDebitCents,
+              quoteId: r.quoteId, provider: r.providerName, feasible: r.feasible, rate: r.rate, source: quotes.find((q) => q.id === r.quoteId)?.provenance ?? null, sourceNote: quotes.find((q) => q.id === r.quoteId)?.sourceNote ?? null, totalDebit: formatUsd(r.totalDebitCents), totalDebitCents: r.totalDebitCents,
               fee: formatUsd(r.feeCents), recipientWillReceive: formatKzt(r.recipientTiyn), roundingSurplus: formatKzt(r.surplusTiyn),
               usdAfterPayment: formatUsd(r.usdAfterCents), estArrivalAt: r.estArrivalAt, expiresAt: r.expiresAt,
               exclusions: r.exclusions.map((e) => ({ code: e.code, message: e.message })),
