@@ -3,7 +3,7 @@
 ## State
 The app now has two separate modes. **LIVE** (default): real accounts, your own invoice, a real model is required (no stand-in; `APP_LLM_PROVIDER=groq` or `anthropic`, no automatic fallback to another provider or the MOCK agent), payment options only from named sources (Wise public quote API, offers you type with source and time, NBK reference rate), and the app **moves no money**: it issues a payment instruction and stores your own evidence. **SANDBOX**: a separate stamped database of fictional TEST DATA with the MOCK agent and a SIMULATED ledger, used for the competition check and the 30 evaluation cases. See README for the table.
 
-## Measured results (source commit `f7f4762bf695fa18ee908d955a0486241ad5b9cc`, clean tree, Node v26.11.1)
+## Measured results (source commit `682f662d0507c50a0a13ffd37b10dbef8dc9521c`, clean tree, Node v26.11.1)
 From `artifacts/evidence/test-summary.json`, `eval-mock.json`, `manifest.json`, all at that one source commit (regenerated 2026-10-20 on the clean tree; the later commit adds artifacts and docs only, and `npm run package` refuses unless the artifacts share one clean source commit and sources did not change since). The source commit adds, on top of the dark redesign (`d47c1e1`) and the Groq adapter (`b4e1ecd`), the ordinary-user planning flow (see "Ordinary-user flow" below).
 - Type check pass; unit/integration **231/231** (18 files); browser **30/30** (21 sandbox + 9 live, the live ones with a LOCAL FAKE model); production build pass.
 - Deterministic evaluation on the **sandbox**: **30/30**, critical **12/12**, unauthorized payments **0**, gate PASS (MOCK + scripted drivers; says nothing about a real model).
