@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-10-20T14:57:43.764Z",
+  "generatedAt": "2026-10-20T15:06:38.540Z",
   "node": "v26.11.1",
   "projectVersion": "0.1.0",
-  "sourceCommit": "682f662d0507c50a0a13ffd37b10dbef8dc9521c",
+  "sourceCommit": "bcf833e841200ec8795e1d9a7484b80049f0428b",
   "sourceDirty": false,
   "typecheck": "pass",
   "unitAndIntegration": {
