@@ -27,6 +27,8 @@ De-identified tool calls: `parse_invoice` ok, `get_balances` ok, `get_quotes` **
 
 Not established by run 2: that the new system prompt (explanation of cost, timing, reserve and excluded options) works with a real model, because the run ended before a proposal existed.
 
+**Follow-up (2026-10-20):** the Wise integration was changed in commit `f94f3a0` to store and use Wise's own total, fee and recipient amount for each option (no rebuild from the rounded rate, no tolerance). It was verified without any model: a regression on the rounding case, exact-amount, hash and tamper tests, and one fresh real Wise response taken through the whole path (`npm run check:sources`). **No real-model run has happened since**; the next one is a manual pass by a person (`docs/MANUAL_PASS.md`).
+
 ## Run 1 (2026-10-19, older sources): PASS, one run
 
 **This is NOT a full verification of the LIVE mode.**
