@@ -152,7 +152,6 @@ if (outcome === "problem") {
   await page.getByTestId("offer-list").scrollIntoViewIfNeeded();
   await caption(page, "Real Wise public quotes for this amount: rate, fee, estimated delivery and expiry come from the provider; nothing is invented");
   await pause(6500);
-  await shot(page, "#offers", `${IMG}/live-offers.png`);
 }
 await page.getByTestId("approval-card").scrollIntoViewIfNeeded();
 await caption(page, "The exact proposal: recipient, amounts, reserve kept, and where this offer came from. The server chose the best route, not the model");
@@ -175,7 +174,6 @@ await page.getByTestId("instruction-card").waitFor({ timeout: 20_000 });
 await page.getByTestId("instruction-card").scrollIntoViewIfNeeded();
 await caption(page, "After your approval the app issues a payment instruction. It has NOT moved any money: finish the payment on Wise or in your bank");
 await pause(8000);
-await shot(page, "#instruction-card", `${IMG}/live-instruction.png`);
 await page.getByTestId("mark-paid").click();
 await caption(page, "You can mark it paid or upload your confirmation. Both are stored as YOUR evidence, with a hash, and are never called bank verification");
 await pause(6500);
@@ -267,36 +265,16 @@ await pause(6000);
 await context.close();
 const vid = (await page.video()?.path()) ?? "";
 
-// ---- slide-grade screenshots: narrow viewport, 2x resolution, no caption overlay, no video ----
-{
-  const ctx2 = await browser.newContext({ viewport: { width: 760, height: 1100 }, deviceScaleFactor: 2 });
-  const p = await ctx2.newPage();
-  await p.goto(BASE);
-  await p.getByTestId("email").fill("bob@demo.local");
-  await p.getByTestId("password").fill("demo-bob-2026");
-  await p.getByTestId("login-btn").click();
-  await p.getByTestId("scenario-s1").click();
-  await p.getByTestId("confirm-invoice").click();
-  await p.getByTestId("start-task").click();
-  await p.getByTestId("approval-card").waitFor();
-  const box = await p.locator("#approval").boundingBox();
-  await p.locator("#approval").screenshot({ path: `${IMG}/approval.png`, clip: undefined });
-  void box;
-  await p.getByTestId("approve-btn").click();
-  await p.getByTestId("receipt").waitFor();
-  await p.locator("#receipt").screenshot({ path: `${IMG}/receipt.png` });
-  await ctx2.close();
-}
 await browser.close();
 await app.close();
 await liveApp.close();
-const webm = "artifacts/demo/tuitionbridge-demo-mock.webm";
+const webm = "artifacts/demo/TuitionBridge_Demo.webm";
 if (vid) renameSync(vid, webm);
 rmSync(VID_DIR, { recursive: true, force: true });
 let dur = "unknown";
 try { dur = execFileSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "default=nw=1:nk=1", webm], { encoding: "utf8" }).trim(); } catch { /* optional */ }
 try {
-  execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-i", webm, "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "28", "-preset", "veryfast", "-an", "artifacts/demo/tuitionbridge-demo-mock.mp4"]);
+  execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-i", webm, "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "28", "-preset", "veryfast", "-an", "artifacts/demo/TuitionBridge_Demo.mp4"]);
 } catch { console.log("mp4 conversion skipped (ffmpeg/libx264 unavailable)"); }
 console.log(`recorded ${webm} (${(statSync(webm).size / 1e6).toFixed(1)} MB), duration ${dur}s, wall ${stamp()}s`);
 process.exit(0);

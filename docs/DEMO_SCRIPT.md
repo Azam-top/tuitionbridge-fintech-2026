@@ -1,7 +1,7 @@
 # Demo script (≤5 minutes) and recording notes
 
 ## What exists
-- **Recorded capture:** `artifacts/demo/tuitionbridge-demo-mock.mp4` (also `.webm`), about 3 min 40 s, no audio, on-screen captions. Two segments: (1) the **LIVE mode** with a **LOCAL FAKE model provider** (so it repeats without a key; the captions say it is not a real model) and the **real** NBK and Wise public sources; (2) the separate **SANDBOX** (fictional test data, MOCK agent, simulated ledger). Regenerate: `npm run build && npm run evidence && npm run demo:capture`.
+- **Recorded capture:** `artifacts/demo/TuitionBridge_Demo.mp4`, about 3 min 40 s, no audio, on-screen captions. Two segments: (1) the **LIVE mode** with a **LOCAL FAKE model provider** (so it repeats without a key; the captions say it is not a real model) and the **real** NBK and Wise public sources; (2) the separate **SANDBOX** (fictional test data, MOCK agent, simulated ledger). Regenerate: `npm run build && npm run evidence && npm run demo:capture`.
 - **Rehearsal status:** a spoken, narrated rehearsal by a team member has **not** happened; the timings are targets. Organizer permission to use a recording at the finals is unconfirmed; keep the live app as the primary path.
 - A recording with a **real model** has not been made (it needs your key; see `docs/LIVE_RUN.md`). If you record one, say the mode on screen.
 

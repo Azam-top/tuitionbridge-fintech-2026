@@ -13,7 +13,7 @@ Deadline: **20 Oct 2026, 23:59 Beijing = 20:59 Almaty**. Recommended: submit on 
 | Evaluation (30 cases) | Done: deterministic, on the **sandbox** test data | `eval/cases.json`, `artifacts/evidence/eval-mock.json` |
 | Presentation (10 slides, 16:9, about 9 minutes) | Done | PDF for submission: `docs/deck/TuitionBridge_Presentation.pdf` (also copied next to the archives in `dist-submission/`). Editable source: `docs/deck/index.html` with `docs/deck/img/` (built by `npm run deck`). Speaker notes: `docs/deck/TuitionBridge_Speaker_Notes.md`. Russian summary for the presenter: `docs/deck/TuitionBridge_Project_Summary_RU.md` |
 | Judge Q&A, demo script | Done | `docs/PITCH_QA.md`, `docs/DEMO_SCRIPT.md` |
-| Demo video (≤5 min) | **Exists, with caveats**: re-recorded 2026-10-18; LIVE segment uses a LOCAL FAKE model provider (captioned) and the real NBK/Wise sources; SANDBOX segment; MOCK/fake model, captions only, no narration | `artifacts/demo/tuitionbridge-demo-mock.mp4` |
+| Demo video (about 3 minutes) | **Exists, with caveats**: the LIVE segment uses a LOCAL FAKE model provider (captioned) and the real NBK/Wise sources; then the SANDBOX segment with the MOCK agent; captions only, no narration | `artifacts/demo/TuitionBridge_Demo.mp4` (also copied next to the ZIP) |
 | AI usage statement | Draft: **HUMAN must complete the review section** | `AI_USAGE.md` |
 | Dependency licenses | Done | `docs/DEPENDENCIES.md` |
 | Repository URL | Done (public) | <https://github.com/Azam-top/tuitionbridge-fintech-2026> |
