@@ -2,14 +2,14 @@
   "kind": "deterministic-mock",
   "label": "Deterministic evaluation: MOCK agent for model-driven cases and scripted/direct drivers for adversarial and failure cases. It exercises the server's tools and policies. It says nothing about how a real model behaves.",
   "casesVersion": "2026-10-v1",
-  "generatedAt": "2026-10-20T10:50:18.216Z",
+  "generatedAt": "2026-10-20T11:44:59.294Z",
   "provenance": {
     "schema": 1,
     "driver": "deterministic-mock+scripted",
     "endpoint": "none",
-    "sourceCommit": "b4e1ecd510b751be4f714ddf838d3a3efaa30f37",
+    "sourceCommit": "bb99c9eac52fb2654fe6641e3baa1b265bff24d6",
     "sourceDirty": false,
-    "runAt": "2026-10-20T10:50:18.216Z",
+    "runAt": "2026-10-20T11:44:59.294Z",
     "parameters": {
       "live": false,
       "pack": null,
@@ -25,7 +25,7 @@
   "environment": {
     "node": "v26.11.1",
     "platform": "linux",
-    "gitHead": "b4e1ecd",
+    "gitHead": "bb99c9e",
     "agentMode": "MOCK",
     "provider": null,
     "model": null,
@@ -89,7 +89,7 @@
     "tokensReported": false,
     "note": "MOCK agent reports no token usage; no cost incurred."
   },
-  "totalLatencyMs": 500,
+  "totalLatencyMs": 471,
   "cases": [
     {
       "id": "ord-01",
@@ -120,7 +120,7 @@
       "mismatches": [],
       "invariantViolations": [],
       "passed": true,
-      "latencyMs": 140,
+      "latencyMs": 132,
       "tokens": null,
       "modelRequests": null
     },
@@ -154,7 +154,7 @@
       "mismatches": [],
       "invariantViolations": [],
       "passed": true,
-      "latencyMs": 17,
+      "latencyMs": 16,
       "tokens": null,
       "modelRequests": null
     },
@@ -186,7 +186,7 @@
       "mismatches": [],
       "invariantViolations": [],
       "passed": true,
-      "latencyMs": 11,
+      "latencyMs": 10,
       "tokens": null,
       "modelRequests": null
     },
@@ -285,7 +285,7 @@
       "mismatches": [],
       "invariantViolations": [],
       "passed": true,
-      "latencyMs": 11,
+      "latencyMs": 12,
       "tokens": null,
       "modelRequests": null
     },
@@ -382,7 +382,7 @@
       "mismatches": [],
       "invariantViolations": [],
       "passed": true,
-      "latencyMs": 16,
+      "latencyMs": 15,
       "tokens": null,
       "modelRequests": null
     },
@@ -415,7 +415,7 @@
       "mismatches": [],
       "invariantViolations": [],
       "passed": true,
-      "latencyMs": 9,
+      "latencyMs": 8,
       "tokens": null,
       "modelRequests": null
     },
@@ -463,7 +463,7 @@
       "mismatches": [],
       "invariantViolations": [],
       "passed": true,
-      "latencyMs": 2,
+      "latencyMs": 3,
       "tokens": null,
       "modelRequests": null
     },
@@ -581,7 +581,7 @@
       "mismatches": [],
       "invariantViolations": [],
       "passed": true,
-      "latencyMs": 27,
+      "latencyMs": 22,
       "tokens": null,
       "modelRequests": null
     },
@@ -603,7 +603,7 @@
       "mismatches": [],
       "invariantViolations": [],
       "passed": true,
-      "latencyMs": 12,
+      "latencyMs": 10,
       "tokens": null,
       "modelRequests": null
     },
@@ -625,7 +625,7 @@
       "mismatches": [],
       "invariantViolations": [],
       "passed": true,
-      "latencyMs": 11,
+      "latencyMs": 10,
       "tokens": null,
       "modelRequests": null
     },
@@ -649,7 +649,7 @@
       "mismatches": [],
       "invariantViolations": [],
       "passed": true,
-      "latencyMs": 11,
+      "latencyMs": 10,
       "tokens": null,
       "modelRequests": null
     },
@@ -671,7 +671,7 @@
       "mismatches": [],
       "invariantViolations": [],
       "passed": true,
-      "latencyMs": 11,
+      "latencyMs": 10,
       "tokens": null,
       "modelRequests": null
     },
@@ -705,7 +705,7 @@
       "mismatches": [],
       "invariantViolations": [],
       "passed": true,
-      "latencyMs": 13,
+      "latencyMs": 10,
       "tokens": null,
       "modelRequests": null
     },
@@ -750,7 +750,7 @@
       "mismatches": [],
       "invariantViolations": [],
       "passed": true,
-      "latencyMs": 10,
+      "latencyMs": 9,
       "tokens": null,
       "modelRequests": null
     },
@@ -814,7 +814,7 @@
       "mismatches": [],
       "invariantViolations": [],
       "passed": true,
-      "latencyMs": 8,
+      "latencyMs": 9,
       "tokens": null,
       "modelRequests": null
     },
@@ -860,7 +860,7 @@
       "mismatches": [],
       "invariantViolations": [],
       "passed": true,
-      "latencyMs": 16,
+      "latencyMs": 12,
       "tokens": null,
       "modelRequests": null
     },
@@ -892,7 +892,7 @@
       "mismatches": [],
       "invariantViolations": [],
       "passed": true,
-      "latencyMs": 16,
+      "latencyMs": 15,
       "tokens": null,
       "modelRequests": null
     },
@@ -914,7 +914,7 @@
       "mismatches": [],
       "invariantViolations": [],
       "passed": true,
-      "latencyMs": 18,
+      "latencyMs": 17,
       "tokens": null,
       "modelRequests": null
     },
@@ -946,7 +946,7 @@
       "mismatches": [],
       "invariantViolations": [],
       "passed": true,
-      "latencyMs": 29,
+      "latencyMs": 30,
       "tokens": null,
       "modelRequests": null
     },
@@ -981,7 +981,7 @@
       "mismatches": [],
       "invariantViolations": [],
       "passed": true,
-      "latencyMs": 8,
+      "latencyMs": 7,
       "tokens": null,
       "modelRequests": null
     }

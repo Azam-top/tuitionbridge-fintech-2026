@@ -46,6 +46,10 @@ After the tools the model wrote an explanation (711 characters) that passed the 
 - Tokens are the provider-reported usage (9,849 in total). `latencyMs` is the sum of the model-request times as measured by the app, not wall time.
 - The task state `APPROVED` means "approved and an instruction was issued". It does not mean a transfer happened.
 
+## Sources changed after this run
+
+The package is built from `bb99c9eac52fb2654fe6641e3baa1b265bff24d6`. Between the smoke run (`b4e1ecd…`) and that commit the web interface changed and the live system prompt (`src/server/agent/runner.ts`) was extended with a required explanation (total and fee, timing against the deadline, reserve kept, why other options were excluded) and a rule not to state unknown fees or times. **This smoke run does not cover the new prompt.** A re-run needs your approval because it spends tokens on your Groq account.
+
 ## What this run does NOT establish
 
 - The **five-case live evaluation** (`npm run eval:live`) was **not run**. `artifacts/evidence/eval-live.json` does not exist, and the real-model evaluation remains **NOT RUN**.
