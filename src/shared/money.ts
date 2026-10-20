@@ -73,6 +73,21 @@ function formatMinor(minor: bigint, symbol: string): string {
 export const formatUsd = (cents: bigint | string): string => formatMinor(BigInt(cents), "USD");
 export const formatKzt = (tiyn: bigint | string): string => formatMinor(BigInt(tiyn), "KZT");
 
+/**
+ * Exact conversion of a decimal amount quoted by a provider into minor units, with no floating-point arithmetic.
+ * Accepts the decimal TEXT ("1126.82") or a JSON number, which is read through its shortest decimal form (for amounts with at
+ * most 15 significant digits that is exactly the text the provider sent). Refuses signs, exponents, more than two decimals,
+ * more than 13 whole digits and zero when `allowZero` is false. Never rounds: an amount that does not fit is an error.
+ */
+export function exactDecimalToMinor(value: unknown, label = "amount", allowZero = false): bigint {
+  const text = typeof value === "number" ? (Number.isFinite(value) ? String(value) : "") : typeof value === "string" ? value : "";
+  const m = /^(\d{1,13})(?:\.(\d{1,2}))?$/.exec(text);
+  if (!m) throw new MoneyError(`${label} is not an exact decimal amount with at most 2 decimals`);
+  const minor = BigInt(m[1]) * 100n + BigInt((m[2] ?? "").padEnd(2, "0") || "0");
+  if (minor === 0n && !allowZero) throw new MoneyError(`${label} must be positive`);
+  return minor;
+}
+
 /** Exact decimal text ("1,234.50") -> minor-unit BigInt with at most 2 fractional digits; no floating point. */
 export function decimalToMinor(text: string, label = "amount"): bigint {
   const m = /^(\d{1,3}(?:,\d{3})+|\d{1,13})(?:\.(\d{1,2}))?$/.exec(text.trim());

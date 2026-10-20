@@ -11,6 +11,7 @@ interface QuoteRow {
   src_ccy: string; dst_ccy: string; rate: string; fee_cents: string; min_kzt_tiyn: string; max_kzt_tiyn: string;
   issued_at: string; expires_at: string; est_arrival_at: string; eligible: number; ineligible_reason: string | null; provenance: string;
   source_note: string | null; observed_at: string | null; external_ref: string | null;
+  provider_source_cents?: string | null; provider_target_tiyn?: string | null;
 }
 
 export const rowToQuote = (r: QuoteRow): QuoteRecord => ({
@@ -18,6 +19,7 @@ export const rowToQuote = (r: QuoteRow): QuoteRecord => ({
   rate: r.rate, feeCents: r.fee_cents, minKztTiyn: r.min_kzt_tiyn, maxKztTiyn: r.max_kzt_tiyn, issuedAt: r.issued_at,
   expiresAt: r.expires_at, estArrivalAt: r.est_arrival_at, eligible: r.eligible === 1, ineligibleReason: r.ineligible_reason,
   provenance: r.provenance, sourceNote: r.source_note, observedAt: r.observed_at, externalRef: r.external_ref,
+  providerAmounts: r.provider_source_cents && r.provider_target_tiyn ? { sourceTotalCents: r.provider_source_cents, targetTiyn: r.provider_target_tiyn } : null,
 });
 
 export function getQuote(ctx: Ctx, ownerId: string, quoteId: string): QuoteRecord {

@@ -92,7 +92,9 @@ CREATE TABLE IF NOT EXISTS quotes (
   provenance TEXT NOT NULL,
   source_note TEXT,
   observed_at TEXT,
-  external_ref TEXT
+  external_ref TEXT,
+  provider_source_cents TEXT,
+  provider_target_tiyn TEXT
 );
 CREATE TABLE IF NOT EXISTS proposals (
   id TEXT PRIMARY KEY,
@@ -233,6 +235,11 @@ export function openDb(path: string, mode?: "live" | "sandbox"): Db {
   db.pragma("busy_timeout = 5000");
   if (path !== ":memory:") db.pragma("journal_mode = WAL");
   db.exec(SCHEMA);
+  // Databases created before exact provider amounts existed get the two nullable columns (old rows keep NULL).
+  const quoteCols = (db.prepare("PRAGMA table_info(quotes)").all() as { name: string }[]).map((c) => c.name);
+  for (const col of ["provider_source_cents", "provider_target_tiyn"]) {
+    if (!quoteCols.includes(col)) db.exec(`ALTER TABLE quotes ADD COLUMN ${col} TEXT`);
+  }
   if (mode) {
     const cur = db.prepare("SELECT value FROM app_meta WHERE key = 'mode'").get() as { value: string } | undefined;
     if (!cur) db.prepare("INSERT INTO app_meta (key, value) VALUES ('mode', ?)").run(mode);

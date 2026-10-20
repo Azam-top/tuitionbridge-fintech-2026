@@ -152,18 +152,21 @@ describe("official reference rate (NBK)", () => {
 
 describe("Wise public quote source", () => {
   const TUITION = 50_000_000n;
-  it("keeps only options reproducible by this app's own arithmetic (recorded real response)", () => {
+  it("keeps the provider's exact amounts for each option (recorded real response)", () => {
     const opts = parseWiseQuote(WISE_FIXTURE, TUITION);
     expect(opts.map((o) => o.providerId).sort()).toEqual(["wise:BANK_TRANSFER", "wise:CREDIT", "wise:DEBIT"]);
     const bank = opts.find((o) => o.providerId === "wise:BANK_TRANSFER")!;
     expect(bank).toMatchObject({ rate: "452.22", feeCents: "1640", provenance: "PROVIDER_LIVE", expiresAt: "2026-10-18T11:18:25Z", estArrivalAt: "2026-10-22T15:20:00Z", observedAt: "2026-10-18T10:48:25Z" });
+    expect(bank.providerAmounts).toEqual({ sourceTotalCents: "112206", targetTiyn: "50000000" }); // Wise's own total and credit
     expect(bank.externalRef).toMatch(/^wise-price:/);
     expect(bank.sourceNote).toMatch(/not guaranteed/);
+    expect(bank.sourceNote).toMatch(/exactly as Wise quoted/);
   });
-  it("drops an option whose total cannot be reproduced, and rejects malformed bodies", () => {
-    const tampered = JSON.parse(JSON.stringify(WISE_FIXTURE)) as { paymentOptions: { payIn: string; sourceAmount: number }[] };
-    tampered.paymentOptions.find((o) => o.payIn === "BANK_TRANSFER")!.sourceAmount += 0.01;
-    expect(parseWiseQuote(tampered, TUITION).map((o) => o.providerId)).not.toContain("wise:BANK_TRANSFER");
+  it("never adjusts what the provider quoted, and rejects malformed bodies", () => {
+    const changed = JSON.parse(JSON.stringify(WISE_FIXTURE)) as { paymentOptions: { payIn: string; sourceAmount: number }[] };
+    changed.paymentOptions.find((o) => o.payIn === "BANK_TRANSFER")!.sourceAmount += 0.01;
+    // the number is stored as quoted (1,122.07): it is not "corrected" toward the rate and not rejected for differing from it
+    expect(parseWiseQuote(changed, TUITION).find((o) => o.providerId === "wise:BANK_TRANSFER")!.providerAmounts!.sourceTotalCents).toBe("112207");
     expect(parseWiseQuote({}, TUITION)).toEqual([]);
     expect(parseWiseQuote(null, TUITION)).toEqual([]);
   });

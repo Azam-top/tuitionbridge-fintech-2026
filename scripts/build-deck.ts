@@ -4,7 +4,7 @@
 import { chromium } from "@playwright/test";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { parseRate, recipientTiyn, senderPrincipalCents, formatKzt, formatUsd } from "../src/shared/money";
+import { formatKzt, formatUsd } from "../src/shared/money";
 import { parseWiseQuote } from "../src/server/services/offers";
 import { assessLiveReport } from "./lib/provenance";
 
@@ -19,7 +19,7 @@ const tests = JSON.parse(readFileSync("artifacts/evidence/test-summary.json", "u
 const liveAssessment = assessLiveReport(existsSync("artifacts/evidence/eval-live.json") ? JSON.parse(readFileSync("artifacts/evidence/eval-live.json", "utf8")) : null);
 const e = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
 
-// Route table computed with the app's own arithmetic from a REAL Wise response recorded on 2026-10-18 (tests/fixtures).
+// Route table from a REAL Wise response recorded on 2026-10-18 (tests/fixtures): the amounts are Wise's own, as the app stores them.
 // The quotes change by the minute; the slide says when they were recorded. NBK reference comes from the recorded RSS body.
 const TUITION = 50_000_000n;
 const wiseRec = JSON.parse(readFileSync("tests/fixtures/wise-quote-usd-kzt.recorded-2026-10-18.json", "utf8")) as unknown;
@@ -27,10 +27,8 @@ const nbkRec = readFileSync("tests/fixtures/nbk-rates.recorded-2026-10-18.xml", 
 const nbk = /<title>USD<\/title>[\s\S]*?<description>([0-9.]+)<\/description>/.exec(nbkRec)?.[1] ?? "unknown";
 const wiseOpts = parseWiseQuote(wiseRec, TUITION);
 const rows = wiseOpts.map((o) => {
-  const rate = parseRate(o.rate);
-  const principal = senderPrincipalCents(TUITION, rate);
-  const total = principal + BigInt(o.feeCents);
-  const got = recipientTiyn(principal, rate);
+  const total = BigInt(o.providerAmounts!.sourceTotalCents);
+  const got = BigInt(o.providerAmounts!.targetTiyn);
   return `<tr class="${o.providerId === "wise:BANK_TRANSFER" ? "best" : ""}"><td>${e(o.providerName)}</td><td>${o.rate}</td><td>${formatUsd(o.feeCents)}</td><td><strong>${formatUsd(total)}</strong></td><td>${formatKzt(got)}</td><td>${e(o.estArrivalAt.slice(0, 10))}</td><td>Provider API (live), ${e(o.observedAt.slice(0, 16).replace("T", " "))} UTC</td></tr>`;
 }).join("");
 
@@ -59,7 +57,7 @@ const S: Slide[] = [
   { title: "Route and reserve algorithm", seconds: 75,
     html: `<p class="small">KZT 500,000.00 tuition, REAL Wise quotes recorded 2026-10-18 (they change by the minute). NBK official reference that day: <strong>${nbk} KZT per USD</strong>, a guide only, never an offer.</p><table class="routes"><thead><tr><th>Option</th><th>Rate (KZT/USD)</th><th>Fee</th><th>Total you pay</th><th>Recipient gets</th><th>Est. delivery</th><th>Source</th></tr></thead><tbody>${rows}</tbody></table>
       <ul class="formulas"><li>principal = ceil(tuition ÷ rate) to a whole cent; total debit = principal + fixed fee</li><li>recipient = floor(principal × rate), must cover tuition; surplus shown</li><li>ranked only if: eligible, unexpired, arrives by the deadline, and USD balance − debit ≥ reserve</li><li>cheapest = debit, then arrival, fee, id; fastest = arrival, debit, fee, id</li></ul>`,
-    notes: "The quotes on this slide are a real Wise response recorded on 2026-10-18 and parsed by the same code the app runs; the app keeps an option only if its own arithmetic reproduces Wise's total to the cent. The NBK rate is a reference, not an offer. Numbers are computed from the same code the app runs. Exact integer math: USD cents and KZT tiyn. Principal is rounded up so the recipient is never short; the recipient amount is rounded down so we never overstate delivery; the surplus is displayed (for example KZT 4.45 on the fast route). Late routes are excluded, not penalized. Arrival times are estimates, not guarantees." },
+    notes: "The quotes on this slide are a real Wise response recorded on 2026-10-18 and parsed by the same code the app runs; for each option the app stores Wise's own total, fee and recipient amount exactly (nothing is rebuilt from the displayed, rounded rate). The NBK rate is a reference, not an offer. Exact integer math: USD cents and KZT tiyn. For offers typed in by the student, the principal is rounded up so the recipient is never short and the recipient amount is rounded down so we never overstate delivery. Late routes are excluded, not penalized. Arrival times are estimates, not guarantees." },
   { title: "Approval and security: the model proposes, a human decides, the server enforces", seconds: 75,
     html: `<div class="flow"><span>Agent prepares proposal</span>→<span>SHA-256 over every critical field</span>→<span class="hl">Student approves (human-only endpoint)</span>→<span>One atomic transaction rechecks everything</span>→<span>LIVE: payment instruction (no money moved) · SANDBOX: simulated receipt</span></div>
       <div class="cols"><div class="panel"><h3>Controls</h3><ul><li>Server sessions, CSRF + Origin checks, owner-scoped data</li><li>Tiers: read, propose, execute</li><li>Approval bound to proposal hash, single-use, expiring</li><li>Idempotency keys; one payment per invoice</li><li>The server, not the model, picks the best route; statuses come from stored records</li><li>Trusted-recipient registry; invoice text is untrusted</li></ul></div>

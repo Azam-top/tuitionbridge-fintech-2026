@@ -69,7 +69,7 @@ export interface Proposal {
     invoiceReference: string; recipientRegistryId: string; beneficiaryName: string; beneficiaryAccount: string; tuitionTiyn: string; rate: string;
     feeCents: string; principalCents: string; totalDebitCents: string; recipientTiyn: string; surplusTiyn: string; quoteId: string; quoteVersion: number;
     providerName: string; estArrivalAt: string; deadlineAt: string; quoteExpiresAt: string; reserveCents: string; preference: string; proposalExpiresAt: string;
-    quoteProvenance: string; quoteSourceNote: string | null; quoteObservedAt: string | null;
+    quoteProvenance: string; quoteSourceNote: string | null; quoteObservedAt: string | null; amountBasis?: "PROVIDER_EXACT_V1";
   };
 }
 export interface TaskEvent { seq: number; kind: string; tool: string | null; ok: boolean | null; text: string | null; at: string; input: unknown; output: Record<string, unknown> | null }

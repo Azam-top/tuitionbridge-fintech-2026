@@ -41,6 +41,8 @@ export interface ProposalPayload {
   quoteProvenance: string;
   quoteSourceNote: string | null;
   quoteObservedAt: string | null;
+  /** Present only for provider quotes: totalDebitCents, principalCents and recipientTiyn are the provider's exact amounts, not recomputed from the rate. */
+  amountBasis?: "PROVIDER_EXACT_V1";
   /** Evidence that the server ranked the current quote set and this quote won the stated objective. */
   selection: {
     basis: "server_ranking_v1";
@@ -166,6 +168,7 @@ export function prepareProposal(ctx: Ctx, input: PrepareInput): ProposalView {
       providerName: quote.providerName, estArrivalAt: quote.estArrivalAt, deadlineAt: inv.due_at,
       quoteExpiresAt: quote.expiresAt, reserveCents: input.reserveCents, preference: input.preference, proposalExpiresAt: expiresAt,
       quoteProvenance: quote.provenance, quoteSourceNote: quote.sourceNote ?? null, quoteObservedAt: quote.observedAt ?? null,
+      ...(quote.providerAmounts ? { amountBasis: "PROVIDER_EXACT_V1" as const } : {}),
       selection,
     };
     const hash = hashPayload(payload);

@@ -42,7 +42,7 @@ Sandbox test accounts (fictional, local only): `alice@demo.local` / `demo-alice-
 | Beneficiary | **a recipient you attested** from an official page (name, account, https address, note). Invoices cannot add or change one. An IBAN-shaped account must pass the mod-97 checksum | "Matched to a recipient you attested" |
 | USD balance and reserve | **declared by you**; the app reads no bank | "declared by you" |
 | Reference FX | National Bank of Kazakhstan RSS (`rates_all.xml`), stored with effective date, retrieval time and body hash | "reference, not an offer" |
-| Wise options | Wise public quote endpoint (unauthenticated). Only currencies and the amount are sent. An option is kept only if this app's own arithmetic reproduces Wise's total to the cent | "Provider API (live)", with rate type and expiry |
+| Wise options | Wise public quote endpoint (unauthenticated). Only currencies and the amount are sent. For each option the app stores Wise's own total, fee and recipient amount exactly (exact decimal to minor units, no recomputation from Wise's rounded displayed rate, no tolerance); malformed or wrong-currency options are dropped | "Provider API (live)", with rate type and expiry |
 | Other offers | typed by you with a source note and the time you saw it; validity ≤ 7 days; a rate more than 25% from the NBK reference is refused as a probable typo | "Entered by you" |
 | Fee, arrival, rate you did not provide | **unknown**; never replaced by a demo number | absent |
 | Payment status | only your own marks and files | "not verified by a bank" |

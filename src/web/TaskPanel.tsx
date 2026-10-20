@@ -99,7 +99,7 @@ function ApprovalCard({ taskId, proposal, live, now, nowMs, approvalMinutes, onC
             <Row label="Tuition due"><span className="num">{formatKzt(p.tuitionTiyn)}</span></Row>
             <Row label={live ? "Route" : "Route (simulated provider)"}>{p.providerName}</Row>
             <Row label="Where this offer came from" testId="offer-source">{PROVENANCE_LABEL[p.quoteProvenance] ?? p.quoteProvenance}{p.quoteObservedAt ? `, seen ${fmtTime(p.quoteObservedAt)}` : ""}{p.quoteSourceNote ? `: ${p.quoteSourceNote}` : ""}</Row>
-            <Row label="Rate (KZT per USD)"><span className="num">{p.rate}</span></Row>
+            <Row label={p.amountBasis ? "Rate shown by the provider (rounded, display only)" : "Rate (KZT per USD)"}><span className="num">{p.rate}</span></Row>
             <Row label="USD to be converted"><span className="num">{formatUsd(p.principalCents)}</span></Row>
             <Row label="Provider fee (fixed, USD)"><span className="num">{formatUsd(p.feeCents)}</span></Row>
             <Row label="Total to be debited from your USD balance" strong testId="will-debit"><span className="num">{formatUsd(p.totalDebitCents)}</span></Row>

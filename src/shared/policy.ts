@@ -1,6 +1,6 @@
 // Pure route/quote policy. No I/O, no clock reads: `now` is always passed in.
 
-import { MoneyError, parseMinor, parseRate, recipientTiyn, senderPrincipalCents } from "./money.js";
+import { MoneyError, parseMinor, parsePositiveMinor, parseRate, recipientTiyn, senderPrincipalCents } from "./money.js";
 
 export type ExclusionCode =
   | "UNSUPPORTED_PAIR"
@@ -33,6 +33,12 @@ export interface QuoteRecord {
   sourceNote?: string | null;
   observedAt?: string | null;
   externalRef?: string | null;
+  /**
+   * PROVIDER_LIVE only: the exact amounts the provider quoted for THIS option, in minor units. When present they are the
+   * authoritative total debit (source) and recipient amount (target); nothing is recomputed from `rate`, which is then only the
+   * provider's displayed (rounded) rate. `feeCents` is the provider's own fee for the same option.
+   */
+  providerAmounts?: { sourceTotalCents: string; targetTiyn: string } | null;
 }
 
 export interface RouteEvaluation {
@@ -83,11 +89,21 @@ export function evaluateQuote(q: QuoteRecord, i: Omit<EvaluateInput, "quotes" | 
   let recipient = 0n;
   let total = 0n;
   try {
-    const rate = parseRate(q.rate);
     fee = parseMinor(q.feeCents, "fee");
-    principal = senderPrincipalCents(i.tuitionTiyn, rate);
-    total = principal + fee;
-    recipient = recipientTiyn(principal, rate);
+    if (q.provenance === "PROVIDER_LIVE") {
+      // The provider's own numbers for this option: debit and credit are taken as quoted, never rebuilt from the rate.
+      if (!q.providerAmounts) throw new MoneyError("this provider quote carries no exact provider amounts; get a fresh quote");
+      total = parsePositiveMinor(q.providerAmounts.sourceTotalCents, "provider total");
+      recipient = parsePositiveMinor(q.providerAmounts.targetTiyn, "provider recipient amount");
+      if (total <= fee) throw new MoneyError("provider total must exceed its fee");
+      principal = total - fee;
+    } else {
+      if (q.providerAmounts) throw new MoneyError("provider amounts are only valid on a provider quote");
+      const rate = parseRate(q.rate);
+      principal = senderPrincipalCents(i.tuitionTiyn, rate);
+      total = principal + fee;
+      recipient = recipientTiyn(principal, rate);
+    }
     if (recipient < i.tuitionTiyn) throw new MoneyError("recipient amount would not cover tuition");
     if (i.tuitionTiyn < parseMinor(q.minKztTiyn) || i.tuitionTiyn > parseMinor(q.maxKztTiyn)) {
       exclusions.push({ code: "AMOUNT_OUT_OF_RANGE", message: "Tuition amount is outside this provider's allowed range." });
