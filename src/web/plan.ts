@@ -75,3 +75,31 @@ export function reserveFromText(text: string): { cents: string | null; unclear: 
 
 /** The states in which a plan is "in force": its reserve is the single effective reserve everywhere. */
 export const PLAN_IN_FORCE = new Set(["RUNNING", "AWAITING_APPROVAL", "EXECUTING", "APPROVED", "COMPLETED"]);
+
+/** "Wise (pay by bank transfer)" -> { title: "Wise", method: "Bank transfer" }; the user's own offers and sandbox quotes are tidied the same way. */
+export function providerParts(name: string): { title: string; method: string } {
+  const pay = /^(.*?)\s*\(pay by ([^)]*)\)\s*$/i.exec(name);
+  if (pay) return { title: pay[1], method: pay[2].charAt(0).toUpperCase() + pay[2].slice(1) };
+  const own = /^(.*?)\s*\(offer entered by you\)\s*$/i.exec(name);
+  if (own) return { title: own[1], method: "Your offer" };
+  const sim = /^(.*?)\s*\(simulated\)\s*$/i.exec(name);
+  if (sim) return { title: sim[1], method: "" };
+  return { title: name, method: "" };
+}
+/** One short line for the main screens, for example "Wise bank transfer". */
+export const providerShort = (name: string): string => { const { title, method } = providerParts(name); return method && method !== "Your offer" ? `${title} ${method.toLowerCase()}` : title; };
+
+/** Where an option came from, in plain words. The technical wording stays in the closed Details. */
+export const SOURCE_NAME: Record<string, string> = { PROVIDER_LIVE: "Wise quote", USER_DECLARED: "Your offer", SIMULATED: "Sandbox test data" };
+export function sourceDetail(provenance: string, note: string | null, observedAt: string | null): string {
+  const name = SOURCE_NAME[provenance] ?? provenance;
+  const when = observedAt ? `${provenance === "USER_DECLARED" ? "seen" : "retrieved"} ${fmtTime(observedAt)}` : "time unknown";
+  if (provenance === "PROVIDER_LIVE") return `${name}, ${when}`;
+  return `${name}, ${when}${note ? `: ${note}` : ""}`;
+}
+
+/** "16:45" in the viewer's time zone. */
+export const clockTime = (iso: string): string => {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+};

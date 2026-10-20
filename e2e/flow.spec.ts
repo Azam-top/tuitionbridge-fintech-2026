@@ -42,9 +42,9 @@ test.describe("TuitionBridge browser flow (MOCK agent, SIMULATED payments)", () 
     await expect(page.getByTestId("usd-reserve")).toContainText("USD 300.00");
     await planPayment(page);
 
-    await expect(page.getByTestId("task-state")).toContainText("Waiting for your approval", { timeout: 15_000 });
+    await expect(page.getByTestId("task-state")).toContainText("Ready for your decision", { timeout: 15_000 });
     // understood intent is shown before approval
-    await expect(page.getByTestId("intent")).toContainText("cheapest");
+    await expect(page.getByTestId("intent")).toContainText("lowest cost");
     await expect(page.getByTestId("intent")).toContainText("USD 300.00");
     // route comparison: late route excluded with a factual reason, cheapest feasible selected
     await expect(page.getByTestId("route-best")).toContainText("SteadyPay");
@@ -53,14 +53,14 @@ test.describe("TuitionBridge browser flow (MOCK agent, SIMULATED payments)", () 
     const card = page.getByTestId("approval-card");
     await expect(page.getByTestId("will-receive")).toContainText("KZT 500,000.00");
     await expect(page.getByTestId("will-debit")).toContainText("USD 1,010.00");
-    await expect(card).toContainText("Recipient will receive");
+    await expect(card).toContainText("will receive");
     await expect(card).not.toContainText("Tuition received");
     await expect(card).toContainText("Alatau Meridian University");
     await expect(card).toContainText("UNI-ALM-001");
     await expect(page.getByTestId("approval-account")).toHaveText("KZ00SANDBOX0000000001");
     await expect(page.getByTestId("deadline")).not.toBeEmpty();
     await expect(page.getByTestId("quote-expiry")).not.toBeEmpty();
-    await expect(page.getByTestId("approval-expiry")).toContainText("minutes");
+    await expect(page.getByTestId("approval-expiry")).toContainText("5 min");
     await expect(page.getByTestId("proposal-hash")).toHaveText(/^[0-9a-f]{64}$/);
     // nothing has moved yet
     await expect(page.getByTestId("usd-balance")).toContainText("USD 1,500.00");
@@ -79,17 +79,17 @@ test.describe("TuitionBridge browser flow (MOCK agent, SIMULATED payments)", () 
     await signIn(page);
     await reset(page, "standard");
     await planPayment(page, { fastest: true }); // the objective control, not free text
-    await expect(page.getByTestId("task-state")).toContainText("Waiting for your approval", { timeout: 15_000 });
+    await expect(page.getByTestId("task-state")).toContainText("Ready for your decision", { timeout: 15_000 });
     await expect(page.getByTestId("route-best")).toContainText("FastLane");
     await expect(page.getByTestId("will-debit")).toContainText("USD 1,025.11");
-    await expect(page.getByTestId("will-receive")).toContainText("rounding surplus");
+    await expect(page.getByTestId("will-receive")).toContainText("rounding");
   });
 
   test("no feasible route: blocked state, no proposal, no payment", async ({ page }) => {
     await signIn(page);
     await reset(page, "all_late");
     await planPayment(page);
-    await expect(page.getByTestId("task-state")).toContainText("Blocked", { timeout: 15_000 });
+    await expect(page.getByTestId("task-state")).toContainText("No plan", { timeout: 15_000 });
     await expect(page.getByTestId("no-route")).toBeVisible();
     await expect(page.getByTestId("approve-btn")).toHaveCount(0);
     await expect(page.getByTestId("usd-balance")).toContainText("USD 1,500.00");
@@ -100,7 +100,7 @@ test.describe("TuitionBridge browser flow (MOCK agent, SIMULATED payments)", () 
     await reset(page, "insufficient");
     await expect(page.getByTestId("usd-balance")).toContainText("USD 900.00");
     await planPayment(page);
-    await expect(page.getByTestId("task-state")).toContainText("Blocked", { timeout: 15_000 });
+    await expect(page.getByTestId("task-state")).toContainText("No plan", { timeout: 15_000 });
     await expect(page.getByTestId("approve-btn")).toHaveCount(0);
   });
 
@@ -111,8 +111,8 @@ test.describe("TuitionBridge browser flow (MOCK agent, SIMULATED payments)", () 
     await expect(page.getByTestId("invoice-issues")).toContainText("RECIPIENT MISMATCH");
     await expect(page.getByTestId("invoice-issues")).toContainText("not a proven fraud finding");
     await expect(page.getByTestId("start-task")).toBeDisabled();
-    await page.getByRole("button", { name: "Edit / correct" }).click();
-    await page.getByLabel("Beneficiary account").fill("KZ00SANDBOX0000000001");
+    await page.getByRole("button", { name: "Edit", exact: true }).click();
+    await page.getByLabel("Recipient account").fill("KZ00SANDBOX0000000001");
     await page.getByRole("button", { name: "Save corrections" }).click();
     await page.getByTestId("confirm-invoice").click();
     await expect(page.getByTestId("start-task")).toBeEnabled();
@@ -121,10 +121,10 @@ test.describe("TuitionBridge browser flow (MOCK agent, SIMULATED payments)", () 
   test("malicious invoice text is shown as untrusted and changes nothing; rejecting leaves ledger untouched", async ({ page }) => {
     await signIn(page);
     await reset(page, "malicious");
-    await expect(page.getByTestId("invoice-notes")).toContainText("untrusted");
+    await expect(page.getByTestId("invoice-notes")).toContainText("not trusted");
     await expect(page.getByTestId("invoice-notes")).toContainText("KZ99ATTACKER0000000001");
     await planPayment(page);
-    await expect(page.getByTestId("task-state")).toContainText("Waiting for your approval", { timeout: 15_000 });
+    await expect(page.getByTestId("task-state")).toContainText("Ready for your decision", { timeout: 15_000 });
     await expect(page.getByTestId("approval-account")).toHaveText("KZ00SANDBOX0000000001");
     await expect(page.getByTestId("usd-balance")).toContainText("USD 1,500.00");
     await page.getByTestId("reject-btn").click();
@@ -165,7 +165,7 @@ test.describe("TuitionBridge browser flow (MOCK agent, SIMULATED payments)", () 
     await page.getByTestId("confirm-invoice").click();
     await expect(page.getByTestId("start-task")).toBeEnabled();
     await page.getByTestId("start-task").click();
-    await expect(page.getByTestId("task-state")).toContainText("Waiting for your approval", { timeout: 15_000 });
+    await expect(page.getByTestId("task-state")).toContainText("Ready for your decision", { timeout: 15_000 });
     await expect(page.getByTestId("will-receive")).toContainText("KZT 200,000.00");
   });
 
@@ -177,7 +177,7 @@ test.describe("TuitionBridge browser flow (MOCK agent, SIMULATED payments)", () 
     await page.getByTestId("confirm-invoice").click();
     await expect(page.getByTestId("stepper").locator("li.now")).toContainText("Plan");
     await page.getByTestId("start-task").click();
-    await expect(page.getByTestId("task-state")).toContainText("Waiting for your approval", { timeout: 15_000 });
+    await expect(page.getByTestId("task-state")).toContainText("Ready for your decision", { timeout: 15_000 });
     await expect(page.getByTestId("stepper").locator("li.now")).toContainText("Review and approve");
     // keyboard/screen-reader focus moves to the approval decision
     await expect(page.locator(":focus")).toHaveAttribute("aria-label", /Approval required/);
@@ -192,7 +192,7 @@ test.describe("TuitionBridge browser flow (MOCK agent, SIMULATED payments)", () 
     await page.getByTestId("scenario-s2").click();
     await page.getByTestId("confirm-invoice").click();
     await page.getByTestId("start-task").click();
-    await expect(page.getByTestId("task-state")).toContainText("Waiting for your approval", { timeout: 15_000 });
+    await expect(page.getByTestId("task-state")).toContainText("Ready for your decision", { timeout: 15_000 });
     const late = page.getByTestId("route-excluded");
     await expect(late).toContainText("BudgetBridge");
     await expect(late).toContainText("LATE");
@@ -215,7 +215,7 @@ test.describe("TuitionBridge browser flow (MOCK agent, SIMULATED payments)", () 
     await expect(page.getByTestId("usd-balance")).toContainText("USD 900.00");
     await page.getByTestId("confirm-invoice").click();
     await page.getByTestId("start-task").click();
-    await expect(page.getByTestId("task-state")).toContainText("Blocked", { timeout: 15_000 });
+    await expect(page.getByTestId("task-state")).toContainText("No plan", { timeout: 15_000 });
     await expect(page.getByTestId("no-route")).toBeVisible();
   });
 
@@ -241,7 +241,7 @@ test.describe("TuitionBridge browser flow (MOCK agent, SIMULATED payments)", () 
     await page.setViewportSize({ width: 360, height: 740 });
     await signIn(page);
     await page.getByTestId("scenario-s1").click();
-    await expect(page.getByTestId("next-step")).toContainText("Check the invoice details");
+    await expect(page.getByTestId("next-step")).toContainText("Check the invoice");
     await page.getByTestId("confirm-invoice").click();
     await page.getByTestId("start-task").click();
     await expect(page.getByTestId("approval-card")).toBeVisible({ timeout: 15_000 });
@@ -279,24 +279,24 @@ test.describe("TuitionBridge browser flow (MOCK agent, SIMULATED payments)", () 
     await expect(page.getByTestId("approval-card")).toBeVisible({ timeout: 15_000 });
     const planner = page.getByTestId("planner");
     await expect(page.getByTestId("recommendation")).toContainText("SteadyPay");
-    await expect(planner).toContainText("You pay USD 1,010.00 in total");
+    await expect(planner).toContainText("You pay USD 1,010.00");
     await expect(planner).toContainText("USD 10.00 fee");
     await expect(planner).toContainText("Arrives about");
     await expect(planner).toContainText("left after paying");
     await expect(page.getByTestId("route-count")).toContainText("3 options");
     // reasons for the other options come from the server's own exclusion messages
-    await planner.getByRole("button", { name: /Why not the other 2 options/ }).click();
+    await planner.getByTestId("why-details").locator("summary").click();
     await expect(planner).toContainText("after the confirmed deadline");
     // inspecting another route changes the panel but not the proposal
     await page.getByTestId("route-ok").locator("label").click();
     await expect(planner).toContainText("FastLane Remit");
-    await expect(planner).toContainText("your proposal covers the recommended route");
+    await expect(planner).toContainText("your plan covers the recommended one");
     await expect(page.getByTestId("will-debit")).toContainText("USD 1,010.00");
     // a route's details expand and collapse
     const toggle = page.getByRole("button", { name: /details for FastLane Remit/ });
     await toggle.click();
     await expect(toggle).toHaveAttribute("aria-expanded", "true");
-    await expect(page.getByTestId("route-ok")).toContainText("Estimated arrival");
+    await expect(page.getByTestId("route-ok")).toContainText("Expected arrival");
     // re-plan: fastest route, through cancel + a new task; nothing is paid
     await page.getByTestId("pref-fastest").click();
     await page.getByTestId("replan").click();
@@ -310,8 +310,8 @@ test.describe("TuitionBridge browser flow (MOCK agent, SIMULATED payments)", () 
     await page.getByTestId("scenario-s1").click();
     await page.getByTestId("confirm-invoice").click();
     await page.getByTestId("start-task").click();
-    await expect(page.getByTestId("review-bar")).toContainText("free after payment and reserve", { timeout: 15_000 });
-    await expect(page.getByTestId("review-bar")).toContainText("You approve every payment");
+    await expect(page.getByTestId("review-bar")).toContainText("free after paying and your reserve", { timeout: 15_000 });
+    await expect(page.getByTestId("review-bar")).toContainText("Nothing happens until you approve");
     await page.getByTestId("review-payment").click();
     await expect(page.locator(":focus")).toHaveAttribute("aria-label", /Approval required/);
     await expect(page.getByTestId("approve-btn")).toBeVisible();

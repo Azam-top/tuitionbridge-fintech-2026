@@ -279,3 +279,19 @@ section.card + .workspace { margin-top: 0; }
 .handoff .btn { text-decoration: none; }
 .tech-rows { margin-top: 10px; }
 .tech > .badges { margin-top: 12px; }
+
+/* ---------- final copy pass: offers, details, notes ---------- */
+.budget-note { grid-column: 1 / -1; background: var(--surface) !important; padding: 8px 16px !important; margin: 0; border-top: 1px solid var(--line); }
+.offer-list { display: grid; gap: 10px; margin-top: 10px; }
+.offer { border: 1px solid var(--line); background: var(--surface-2); border-radius: 14px; padding: 12px 14px; display: grid; gap: 8px; }
+.offer.expired { opacity: .72; border-color: rgba(242, 136, 124, .45); }
+.offer-top { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.offer-name { flex: 1 1 auto; min-width: 0; }
+.offer-total { font-size: 1.15rem; letter-spacing: -.02em; }
+.offer-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 6px 14px; margin: 0; }
+.offer-facts div { display: grid; gap: 1px; } .offer-facts dt { color: var(--muted); font-size: .76rem; } .offer-facts dd { margin: 0; font-size: .9rem; }
+.offer-details > summary, .why > summary { cursor: pointer; color: var(--accent); font-size: .85rem; min-height: 32px; display: flex; align-items: center; }
+.why { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 4px; }
+.why .assistant { border-top: 0; margin-top: 6px; padding-top: 0; }
+.offers-bar { margin-bottom: 4px; }
+[hidden] { display: none !important; }

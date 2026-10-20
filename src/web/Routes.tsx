@@ -3,8 +3,7 @@ import type { Proposal, RouteRow } from "./api";
 import { Chip } from "./components";
 import { fmtRelative, fmtTime, formatUsd } from "./format";
 import { Icon } from "./icons";
-import { iconForRoute } from "./plan";
-import { PROVENANCE_LABEL } from "./LivePanels";
+import { iconForRoute, providerParts, SOURCE_NAME } from "./plan";
 
 /** Height-animated disclosure (150-350ms; instant under reduced motion). Content is inert while closed. */
 export function Reveal({ open, id, children }: { open: boolean; id: string; children: React.ReactNode }) {
@@ -15,27 +14,29 @@ export function Reveal({ open, id, children }: { open: boolean; id: string; chil
   );
 }
 
-function RouteDetails({ r, now, live }: { r: RouteRow; now: string; live: boolean }) {
+function RouteDetails({ r, now }: { r: RouteRow; now: string }) {
   return (
     <>
       <dl className="kv">
-        <div><dt>University receives</dt><dd className="num">{r.recipientWillReceive}{r.roundingSurplus !== "KZT 0.00" && <small className="muted"> (incl. {r.roundingSurplus} rounding surplus)</small>}</dd></div>
+        <div><dt>University receives</dt><dd className="num">{r.recipientWillReceive}{r.roundingSurplus !== "KZT 0.00" && <small className="muted"> (incl. {r.roundingSurplus} rounding)</small>}</dd></div>
         <div><dt>Fee</dt><dd className="num">{r.fee}</dd></div>
-        <div><dt>Rate</dt><dd className="num">{r.rate ? `${r.rate} KZT per USD` : "unknown"}</dd></div>
         <div><dt>USD left after paying</dt><dd className="num">{r.usdAfterPayment}</dd></div>
-        <div><dt>Estimated arrival</dt><dd title={r.estArrivalAt}>{fmtTime(r.estArrivalAt)} <small className="muted">({fmtRelative(r.estArrivalAt, now)})</small></dd></div>
-        <div><dt>Quote valid until</dt><dd>{fmtTime(r.expiresAt)}</dd></div>
-        <div><dt>Source</dt><dd>{r.source ? (PROVENANCE_LABEL[r.source] ?? r.source) : "unknown"}{r.sourceNote ? <small className="muted block">{r.sourceNote}</small> : null}</dd></div>
+        <div><dt>Expected arrival</dt><dd title={r.estArrivalAt}>{fmtTime(r.estArrivalAt)} <small className="muted">({fmtRelative(r.estArrivalAt, now)})</small></dd></div>
+        <div><dt>Valid until</dt><dd>{fmtTime(r.expiresAt)}</dd></div>
+        <div><dt>Source</dt><dd>{r.source ? (SOURCE_NAME[r.source] ?? r.source) : "unknown"}{r.source === "USER_DECLARED" && r.sourceNote ? <small className="muted block">{r.sourceNote}</small> : null}</dd></div>
+        <div><dt>Rate shown</dt><dd className="num">{r.rate ? `${r.rate} KZT per USD` : "unknown"}</dd></div>
       </dl>
       {!r.feasible && (
         <ul className="reasons" aria-label="Why this route is excluded">
           {r.exclusions.map((e, k) => <li key={k}><Chip tone="bad">{e.code.replace(/_/g, " ")}</Chip> {e.message}</li>)}
         </ul>
       )}
-      {live && r.source === "USER_DECLARED" && <p className="muted small">This offer was typed in by you; the app cannot check it with the bank.</p>}
+      {r.source === "USER_DECLARED" && <p className="muted small">You entered this offer; TuitionBridge cannot check it with the bank.</p>}
     </>
   );
 }
+
+const providerShortName = (n: string): string => { const p = providerParts(n); return p.method ? `${p.title} ${p.method}` : p.title; };
 
 export function RoutePicker({ routes, best, proposal, nowMs, now, live, selectedId, onSelect }: {
   routes: RouteRow[]; best: string | null; proposal: Proposal | null; nowMs: number; now: string; live: boolean; selectedId: string | null; onSelect: (id: string) => void;
@@ -45,13 +46,13 @@ export function RoutePicker({ routes, best, proposal, nowMs, now, live, selected
   return (
     <section className="card routes-card" id="routes" aria-labelledby="routes-h">
       <header className="card-head">
-        <h2 id="routes-h">Choose a transfer</h2>
+        <h2 id="routes-h">Compare options</h2>
         <span className="muted small" data-testid="route-count">
-          {routes.length === 0 ? "No options" : `${routes.length} ${routes.length === 1 ? "option" : "options"} from your sources · ${qualifying} qualify`}
+          {routes.length === 0 ? "No options" : `${routes.length} ${routes.length === 1 ? "option" : "options"} · ${qualifying} qualify`}
         </span>
       </header>
       <fieldset className="route-list" data-testid="routes-table">
-        <legend className="sr-only">Transfer options, ranked by the server. Selecting a row shows its details; the proposal covers the recommended one.</legend>
+        <legend className="sr-only">Transfer options. Selecting one shows its details; the plan covers the recommended option.</legend>
         {routes.map((r) => {
           const kind = r.feasible ? (r.quoteId === best ? "best" : "ok") : "excluded";
           const expired = Date.parse(r.expiresAt) <= nowMs;
@@ -65,15 +66,15 @@ export function RoutePicker({ routes, best, proposal, nowMs, now, live, selected
                   <span className="radio-dot" aria-hidden="true" />
                   <span className="tile" aria-hidden="true"><Icon name={iconForRoute(r)} size={20} /></span>
                   <span className="route-main">
-                    <strong>{r.provider.replace(" (simulated)", "")}</strong>
+                    <strong>{providerParts(r.provider).title}{providerParts(r.provider).method && <span className="muted"> · {providerParts(r.provider).method}</span>}</strong>
                     <span className="muted small">
                       {!live && r.source === "SIMULATED" ? "Sandbox test quote · " : ""}Arrives about {fmtTime(r.estArrivalAt)}
                     </span>
                     <span className="chips-inline">
                       {kind === "best" && <Chip tone="accent">Best fit</Chip>}
-                      {kind === "ok" && <Chip tone="info">Qualifies</Chip>}
+                      {kind === "ok" && <Chip tone="info">Also qualifies</Chip>}
                       {!r.feasible && r.exclusions.map((e, k) => <Chip key={k} tone="bad">{e.code.replace(/_/g, " ")}</Chip>)}
-                      {expired && <Chip tone="warn">Quote expired</Chip>}
+                      {expired && <Chip tone="bad">Offer expired</Chip>}
                     </span>
                   </span>
                   <span className="route-price">
@@ -81,17 +82,16 @@ export function RoutePicker({ routes, best, proposal, nowMs, now, live, selected
                     <span className="muted small num">incl. {r.fee} fee</span>
                   </span>
                 </label>
-                <button type="button" className="icon-btn" aria-expanded={open === r.quoteId} aria-controls={dId} aria-label={`${open === r.quoteId ? "Hide" : "Show"} details for ${r.provider.replace(" (simulated)", "")}`} onClick={() => setOpen(open === r.quoteId ? null : r.quoteId)}>
+                <button type="button" className="icon-btn" aria-expanded={open === r.quoteId} aria-controls={dId} aria-label={`${open === r.quoteId ? "Hide" : "Show"} details for ${providerShortName(r.provider)}`} onClick={() => setOpen(open === r.quoteId ? null : r.quoteId)}>
                   <Icon name="chevronDown" size={18} className="chev" />
                 </button>
               </div>
-              <Reveal open={open === r.quoteId} id={dId}><RouteDetails r={r} now={now} live={live} /></Reveal>
+              <Reveal open={open === r.quoteId} id={dId}><RouteDetails r={r} now={now} /></Reveal>
             </div>
           );
         })}
       </fieldset>
-      {!best && <p className="alert" role="alert" data-testid="no-route"><Icon name="alert" size={18} /> No route qualifies, so no payment was proposed. Read the reasons on each option; you can add funds or offers, or choose a different reserve yourself. The agent will not change them for you.</p>}
-      {proposal && <p className="muted small">Each option is a fixed USD fee at its own rate; this app adds no other FX margin.</p>}
+      {!best && <p className="alert" role="alert" data-testid="no-route"><Icon name="alert" size={18} /> No option qualifies right now. Each option shows why.</p>}
     </section>
   );
 }
@@ -108,8 +108,8 @@ export function ProtectedBudget({ balanceCents, totalCents, reserveCents }: { ba
   return (
     <section className="card budget-card" aria-labelledby="budget-h" data-testid="budget-card">
       <header className="card-head">
-        <div className="head-with-tile"><span className="tile" aria-hidden="true"><Icon name="wallet" size={20} /></span><div><h2 id="budget-h">Your budget, protected</h2><p className="muted small">Money set aside for living costs stays set aside.</p></div></div>
-        <div className="head-figure"><span className="muted small">USD you declared</span><strong className="num">{formatUsd(balanceCents)}</strong></div>
+        <div className="head-with-tile"><span className="tile" aria-hidden="true"><Icon name="wallet" size={20} /></span><div><h2 id="budget-h">Your budget</h2></div></div>
+        <div className="head-figure"><span className="muted small">Funds</span><strong className="num">{formatUsd(balanceCents)}</strong></div>
       </header>
       <div className="bar" role="img" aria-label={`Of ${formatUsd(balanceCents)}: this payment ${formatUsd(totalCents)}, protected ${formatUsd(reserveCents)}, free ${short ? "none; short by " + formatUsd(-free) : formatUsd(freeShown)}`}>
         <span className="seg seg-pay" style={{ width: `${w(total)}%` }} />
@@ -118,11 +118,10 @@ export function ProtectedBudget({ balanceCents, totalCents, reserveCents }: { ba
       </div>
       <ul className="legend">
         <li><span className="swatch seg-pay" /><span className="muted small">This payment</span><strong className="num">{formatUsd(totalCents)}</strong><span className="muted small num">{pct(total, balance)}%</span></li>
-        <li><span className="swatch seg-keep" /><span className="muted small">Protected</span><strong className="num">{formatUsd(reserveCents)}</strong><span className="muted small num">{pct(reserve, balance)}%</span></li>
-        <li><span className="swatch seg-free" /><span className="muted small">Free to use</span><strong className="num">{short ? "none" : formatUsd(freeShown)}</strong><span className="muted small num">{short ? "" : `${pct(freeShown, balance)}%`}</span></li>
+        <li><span className="swatch seg-keep" /><span className="muted small">Living reserve</span><strong className="num">{formatUsd(reserveCents)}</strong><span className="muted small num">{pct(reserve, balance)}%</span></li>
+        <li><span className="swatch seg-free" /><span className="muted small">Left over</span><strong className="num">{short ? "none" : formatUsd(freeShown)}</strong><span className="muted small num">{short ? "" : `${pct(freeShown, balance)}%`}</span></li>
       </ul>
-      {short && <p className="alert" role="alert"><Icon name="alert" size={18} /> Not enough money: this option would be short by {formatUsd(-free)} after your protected reserve.</p>}
-      <p className="muted small">Figures follow the option you have selected above.</p>
+      {short && <p className="alert" role="alert"><Icon name="alert" size={18} /> Not enough money: this option would leave you {formatUsd(-free)} short of your living reserve.</p>}
     </section>
   );
 }

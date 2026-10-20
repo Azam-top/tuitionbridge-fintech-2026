@@ -78,7 +78,7 @@ export function TechnicalDetails({ config }: { config: Config | null }) {
       <summary>Technical details</summary>
       <ModeBadges config={config} />
       <dl className="rows tech-rows">
-        <Row label="Assistant model">{config.agentStatus === "NOT_CONFIGURED" ? "not configured" : config.llmModel ?? (config.agentStatus === "MOCK" ? "MOCK stand-in (sandbox only)" : "unknown")}</Row>
+        <Row label="AI model">{config.agentStatus === "NOT_CONFIGURED" ? "not configured" : config.llmModel ?? (config.agentStatus === "MOCK" ? "MOCK stand-in (sandbox only)" : "unknown")}</Row>
         <Row label="Payments">{live ? "The app never moves money; it issues payment instructions." : "Simulated in a test ledger."}</Row>
         <Row label="Run limits">{config.limits.maxToolCalls} tool calls, {config.limits.maxModelRequests} model requests, {config.limits.maxTransientRetries} retries per plan</Row>
         {live && <Row label="Wise quotes">{config.wiseQuotes ? "fetched by the server when you plan" : "switched off (APP_WISE_QUOTES)"}</Row>}

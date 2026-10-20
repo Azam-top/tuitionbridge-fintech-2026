@@ -8,7 +8,7 @@ import { httpFetch } from "../ctx.js";
 import { newId } from "../ids.js";
 import { PolicyError } from "../errors.js";
 import { decimalToMinor, exactDecimalToMinor, parseRate } from "../../shared/money.js";
-import type { QuoteRecord } from "../../shared/policy.js";
+import { evaluateQuote, type QuoteRecord } from "../../shared/policy.js";
 import { audit } from "./audit.js";
 import { getInvoice, parseInput } from "./invoices.js";
 import { latestQuotesForInvoice } from "./quotes.js";
@@ -200,14 +200,23 @@ export async function refreshProviderOffers(ctx: Ctx, ownerId: string, invoiceId
 export interface OfferView {
   id: string; providerName: string; provenance: string; rate: string; feeCents: string; expiresAt: string; estArrivalAt: string;
   observedAt: string | null; sourceNote: string | null; expired: boolean; deviationBps: number | null;
+  /** What the user would pay in total and what the university would receive, from the same function every later check uses (null if the quote is unusable). */
+  totalDebitCents: string | null; recipientTiyn: string | null;
 }
 
 /** Current (highest-version) offers per provider for an invoice, as shown to the user. */
 export function listOffers(ctx: Ctx, ownerId: string, invoiceId: string): OfferView[] {
   const ref = latestReference(ctx);
   const now = ctx.clock.now().getTime();
-  return latestQuotesForInvoice(ctx, ownerId, invoiceId).map((q) => ({
-    id: q.id, providerName: q.providerName, provenance: q.provenance, rate: q.rate, feeCents: q.feeCents, expiresAt: q.expiresAt, estArrivalAt: q.estArrivalAt,
-    observedAt: q.observedAt ?? null, sourceNote: q.sourceNote ?? null, expired: Date.parse(q.expiresAt) <= now, deviationBps: ref ? deviationBps(q.rate, ref) : null,
-  }));
+  const inv = getInvoice(ctx, ownerId, invoiceId);
+  return latestQuotesForInvoice(ctx, ownerId, invoiceId).map((q) => {
+    // Amounts come from the same evaluation every later step uses; funds and reserve are not part of "what this offer costs".
+    const ev = evaluateQuote(q, { tuitionTiyn: BigInt(inv.amount_kzt_tiyn), deadlineAt: inv.due_at, now: new Date(now).toISOString(), usdBalanceCents: 0n, usdReserveCents: 0n });
+    const usable = !ev.exclusions.some((e) => e.code === "INVALID_QUOTE");
+    return {
+      id: q.id, providerName: q.providerName, provenance: q.provenance, rate: q.rate, feeCents: q.feeCents, expiresAt: q.expiresAt, estArrivalAt: q.estArrivalAt,
+      observedAt: q.observedAt ?? null, sourceNote: q.sourceNote ?? null, expired: Date.parse(q.expiresAt) <= now, deviationBps: ref ? deviationBps(q.rate, ref) : null,
+      totalDebitCents: usable ? ev.totalDebitCents : null, recipientTiyn: usable ? ev.recipientTiyn : null,
+    };
+  });
 }

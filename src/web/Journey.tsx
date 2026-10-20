@@ -1,7 +1,7 @@
 import type { Config, Invoice, TaskView } from "./api";
 
 export const STEPS = ["Confirm invoice", "Plan", "Review and approve", "Receipt"];
-export const LIVE_STEPS = ["Set up", "Confirm invoice", "Plan", "Review and approve", "Pay and upload"];
+export const LIVE_STEPS = ["Set up", "Invoice", "Plan", "Review", "Pay"];
 
 export interface JourneyCtx { config: Config | null; setupDone: boolean; offerCount: number }
 
@@ -32,23 +32,23 @@ export function nextStep(invoice: Invoice | null, task: TaskView | null, c: Jour
   const s = task?.task.state;
   const active = s === "RUNNING" || s === "AWAITING_APPROVAL" || s === "EXECUTING";
   const live = c.config?.appMode === "live";
-  if (s === "RUNNING") return { tone: "wait", title: "The agent is comparing routes", body: live ? "It reads your confirmed invoice, declared funds and current offers, then prepares one proposal. Nothing is paid." : "It reads your confirmed invoice and balances, fetches quotes and prepares one proposal. Nothing is paid." };
-  if (s === "AWAITING_APPROVAL") return { tone: "go", title: "Your decision: approve or reject", body: "Compare the routes, check the recipient, the amounts and where each offer came from, then approve or reject the exact payment below." };
-  if (s === "EXECUTING") return { tone: "wait", title: "Recording your approved payment", body: "The payment is being written to the sandbox ledger." };
-  if (live && (s === "APPROVED" || invoice?.status === "INSTRUCTED")) return { tone: "go", title: "Pay outside the app, then keep your confirmation", body: "The app has not moved any money. Follow the instruction below in your bank or Wise, then mark it paid or upload your confirmation. Both are stored as your own evidence, not as verification." };
-  if (!live && !active && s === "COMPLETED") return { tone: "done", title: "Payment recorded in the sandbox ledger", body: "Your receipt is below. This is a simulated record, not a bank transfer." };
-  if (!active && invoice?.status === "PAID") return { tone: "done", title: "This invoice is already paid (simulated)", body: "Load another invoice or a demo scenario to try a different case." };
-  if (!active && s === "BLOCKED") return { tone: "stop", title: "Nothing was paid", body: "Read the reason below. If a detail was wrong, correct the invoice and confirm it again. The agent never lowers your living-expense reserve or moves the deadline to make a route fit." };
-  if (!active && s === "FAILED") return { tone: "stop", title: "The task stopped; nothing was paid", body: live ? "You can start a new plan." : "A payment exists only if a receipt is shown. You can start a new plan." };
-  if (!active && s === "CANCELLED") return { tone: "stop", title: "Cancelled: nothing was paid", body: "Plan again whenever you are ready." };
-  if (live && !c.setupDone) return { tone: "go", title: "Set up your funds and your recipient", body: "Declare the USD you have and the amount to keep for living costs, then add your university from its official payment page." };
-  if (!invoice) return { tone: "go", title: "Add your invoice", body: "Enter it by hand or upload a text PDF. You will review every field." };
-  if (invoice.status === "PAID") return { tone: "done", title: "This invoice is already paid (simulated)", body: "Nothing further is needed." };
-  if (invoice.status === "BLOCKED") return { tone: "stop", title: "Correct the invoice", body: "The recipient or a field did not pass validation. Edit it, then revalidate and confirm." };
-  if (invoice.status === "DRAFT") return { tone: "go", title: "Check the invoice details", body: "Confirm the recipient, amount and deadline are right. The agent only works on invoices you confirmed." };
-  if (live && c.config?.agentStatus === "NOT_CONFIGURED") return { tone: "stop", title: "Planning needs a model", body: "Follow the setup banner above to configure a model. Your invoice and offers are saved." };
-  if (live && c.offerCount === 0 && !c.config?.wiseQuotes) return { tone: "go", title: "Add a payment option", body: "Live Wise quotes are switched off in this setup. Enter an offer from your bank, then press Plan my payment." };
-  return { tone: "go", title: "Tell the agent what to do", body: "Choose what matters and how much to keep for living costs, then press Plan my payment. The server fetches the current Wise quotes for you." };
+  if (s === "RUNNING") return { tone: "wait", title: "Comparing your options", body: live ? "Getting current quotes and checking them against your invoice and reserve." : "Comparing the test quotes against your invoice and reserve." };
+  if (s === "AWAITING_APPROVAL") return { tone: "go", title: "Review and approve", body: "Check the recipient, amounts and timing, then approve or reject." };
+  if (s === "EXECUTING") return { tone: "wait", title: "Recording your approved payment", body: "Writing it to the sandbox ledger." };
+  if (live && (s === "APPROVED" || invoice?.status === "INSTRUCTED")) return { tone: "go", title: "Complete your payment", body: "Follow the instruction below. TuitionBridge does not move money." };
+  if (!live && !active && s === "COMPLETED") return { tone: "done", title: "Payment recorded in the sandbox", body: "The receipt below is a simulated record, not a bank transfer." };
+  if (!active && invoice?.status === "PAID") return { tone: "done", title: "This invoice is paid (simulated)", body: "Load another invoice or a demo scenario to try a different case." };
+  if (!active && s === "BLOCKED") return { tone: "stop", title: "No plan yet", body: "See the reason on the right. Fix the invoice, reserve or offers, then plan again." };
+  if (!active && s === "FAILED") return { tone: "stop", title: "The plan stopped", body: "See the reason on the right and try again." };
+  if (!active && s === "CANCELLED") return { tone: "stop", title: "Cancelled", body: "Plan again whenever you are ready." };
+  if (live && !c.setupDone) return { tone: "go", title: "Set up your funds and university", body: "Enter your USD funds and living reserve, then add your university's account from its official payment page." };
+  if (!invoice) return { tone: "go", title: "Add your invoice", body: "Enter it by hand or upload a text PDF, then check every field." };
+  if (invoice.status === "PAID") return { tone: "done", title: "This invoice is paid (simulated)", body: "Nothing further is needed." };
+  if (invoice.status === "BLOCKED") return { tone: "stop", title: "Correct the invoice", body: "A field did not pass the check. Edit it, then confirm again." };
+  if (invoice.status === "DRAFT") return { tone: "go", title: "Check the invoice", body: "Confirm the recipient, amount and deadline are right." };
+  if (live && c.config?.agentStatus === "NOT_CONFIGURED") return { tone: "stop", title: "Planning needs setup", body: "Add an AI model as described above. Your invoice is saved." };
+  if (live && c.offerCount === 0 && !c.config?.wiseQuotes) return { tone: "go", title: "Add an offer", body: "Wise quotes are off in this setup. Enter your bank's offer, then plan." };
+  return { tone: "go", title: "Plan your payment", body: live ? "Choose your goal and living reserve. We get current Wise quotes and compare them." : "Choose your goal and living reserve, then plan." };
 }
 
 export function Journey({ invoice, task, ctx }: { invoice: Invoice | null; task: TaskView | null; ctx: JourneyCtx }) {

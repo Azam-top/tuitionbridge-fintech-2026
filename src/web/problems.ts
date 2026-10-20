@@ -9,8 +9,6 @@ export interface Problem {
   kind: ProblemKind;
   title: string;
   reason: string;
-  /** Always true: a stopped task never moves money. Shown so the user is never left wondering. */
-  nothingPaid: true;
   actions: ProblemAction[];
 }
 
@@ -23,6 +21,24 @@ export function wiseNote(view: TaskView): string | null {
 }
 
 const wiseFailed = (note: string | null): boolean => !!note && !/^Fetched \d+ Wise option/.test(note);
+
+/** The server's note about the Wise fetch, in plain words. */
+function wiseReason(note: string | null): string {
+  if (!note) return "Wise did not return any quotes.";
+  if (/could not be reached/i.test(note)) return "Wise could not be reached right now.";
+  if (/switched off/i.test(note)) return "Wise quotes are off in this setup.";
+  return "Wise did not return a usable quote for this amount.";
+}
+
+/** The adapter's sanitized failure text, in plain words (no provider or model names). */
+function modelReason(msg: string): string {
+  if (/rate limit/i.test(msg)) return "The AI service is busy right now. Wait a minute, then try again.";
+  if (/did not answer/i.test(msg)) return "The AI service did not answer in time. Try again.";
+  if (/could not reach|network/i.test(msg)) return "Could not reach the AI service. Check your connection and try again.";
+  const http = /HTTP (\d{3})/.exec(msg);
+  if (http) return `The AI service returned an error (${http[1]}). Trying again usually works.`;
+  return "The AI service did not respond. Try again.";
+}
 
 /** "PROVIDER_FAILURE: Groq rate limit (HTTP 429)." -> ["PROVIDER_FAILURE", "Groq rate limit (HTTP 429)."] */
 function splitError(err: string | null): [string, string] {
@@ -41,20 +57,15 @@ export function diagnose(view: TaskView | null): Problem | null {
 
   if (state === "BLOCKED" && noOffers) {
     return wiseFailed(note)
-      ? { kind: "wise", title: "Wise quotes could not be loaded", reason: `${note} Nothing was invented in their place.`, nothingPaid: true, actions: ["retry", "manual"] }
-      : { kind: "no-offers", title: "There are no current payment options", reason: "No offer is valid right now. Try again for fresh Wise quotes, or add an offer you were given by your bank.", nothingPaid: true, actions: ["retry", "manual"] };
+      ? { kind: "wise", title: "Wise quotes could not be loaded", reason: `${wiseReason(note)} Try again, or add your bank's offer.`, actions: ["retry", "manual"] }
+      : { kind: "no-offers", title: "No current options", reason: "No offer is valid right now. Try again for fresh Wise quotes, or add your bank's offer.", actions: ["retry", "manual"] };
   }
   if (state === "FAILED" && code === "PROVIDER_FAILURE") {
-    const rate = /rate limit/i.test(msg);
-    return {
-      kind: "model", title: "The AI assistant could not finish",
-      reason: `${msg || "The model provider did not answer."}${rate ? " Wait a minute, then try again." : " Trying again usually works."}`,
-      nothingPaid: true, actions: ["retry"],
-    };
+    return { kind: "model", title: "The AI assistant could not finish", reason: modelReason(msg), actions: ["retry"] };
   }
   if (state === "FAILED" && code === "LIMIT_REACHED") {
-    return { kind: "limit", title: "The planning run hit its safety limit", reason: `${msg} It stopped on purpose so it cannot loop or overspend. Try again.`, nothingPaid: true, actions: ["retry"] };
+    return { kind: "limit", title: "The planning run hit its safety limit", reason: "The plan stopped on purpose after too many steps. Try again.", actions: ["retry"] };
   }
   if (state === "BLOCKED" && !error) return null; // e.g. no feasible route: the summary already lists the reasons
-  return { kind: "other", title: state === "FAILED" ? "The plan stopped" : "The plan was blocked", reason: msg || "The server stopped this task.", nothingPaid: true, actions: ["retry"] };
+  return { kind: "other", title: state === "FAILED" ? "The plan stopped" : "The plan was blocked", reason: msg || "The plan could not be completed.", actions: ["retry"] };
 }

@@ -211,8 +211,8 @@ export function App() {
       <Journey invoice={invoice} task={task} ctx={{ config, setupDone, offerCount: offers.filter((o) => !o.expired).length }} />
 
       <section className="hero">
-        <h1>Your tuition. A clear way forward.</h1>
-        <p className="muted">Compare transfer options without touching your living budget.</p>
+        <h1>Plan your tuition payment</h1>
+        <p className="muted">Compare transfer options and keep your living costs safe.</p>
       </section>
 
       {config?.demoMode && (
@@ -228,7 +228,7 @@ export function App() {
       )}
 
       <main className="workspace">
-        <Budget st={st} live={live} reserveCents={effectiveReserve} planning={inForce} />
+        <Budget st={st} live={live} reserveCents={effectiveReserve} />
         {live && st && <FundsEditor key={st.balances.usd.balanceCents + st.balances.usd.reserveCents} balances={st.balances} locked={taskIsActive} onSaved={() => { setError(null); void refresh(); }} onError={onError} />}
         {live && <RecipientsCard recipients={recipients} onChanged={() => { setError(null); void refresh(); }} onError={onError} />}
         {taskLeads ? <>{planner}{taskPanel}{invoiceCards}</> : <>{invoiceCards}{planner}{taskPanel}</>}
@@ -241,27 +241,28 @@ export function App() {
       <TechnicalDetails config={config} />
 
       <footer className="foot muted small">
-        {live ? "Live mode: your own data. The app issues payment instructions and never moves money." : `Fictional university, providers and data. Fixtures ${config?.fixturesVersion ?? ""}.`}
+        {live ? "TuitionBridge prepares your payment. You complete it on Wise or in your bank." : `Fictional university, providers and data. Fixtures ${config?.fixturesVersion ?? ""}.`}
       </footer>
     </div>
   );
 }
 
 /** Funds at a glance. The reserve shown is the one effective reserve of the plan (or of the plan about to start), never a second number. */
-function Budget({ st, live, reserveCents, planning }: { st: StateResponse | null; live: boolean; reserveCents: string | null; planning: boolean }) {
+function Budget({ st, live, reserveCents }: { st: StateResponse | null; live: boolean; reserveCents: string | null }) {
   if (!st) return null;
   const b = st.balances;
   const saved = b.usd.reserveCents;
   const avail = reserveCents !== null ? (BigInt(b.usd.balanceCents) - BigInt(reserveCents) < 0n ? "0" : (BigInt(b.usd.balanceCents) - BigInt(reserveCents)).toString()) : null;
   return (
     <section className="budget" id="funds" aria-label="Your funds" data-testid="funds">
-      <div><span>{live ? "USD you declared" : "USD balance"}</span><strong className="num" data-testid="usd-balance">{formatUsd(b.usd.balanceCents)}</strong></div>
+      <div><span>Funds</span><strong className="num" data-testid="usd-balance">{formatUsd(b.usd.balanceCents)}</strong></div>
       <div>
-        <span>{planning ? "Kept for living costs (this plan)" : "Kept for living costs"}</span>
+        <span>Living reserve</span>
         <strong className="num" data-testid="usd-reserve">{reserveCents !== null ? formatUsd(reserveCents) : "—"}</strong>
         {reserveCents !== null && reserveCents !== saved && <small className="muted">Saved default: {formatUsd(saved)}</small>}
       </div>
-      <div><span>Available to pay</span><strong className="num" data-testid="usd-available">{avail !== null ? formatUsd(avail) : "—"}</strong></div>
+      <div><span>Available for tuition</span><strong className="num" data-testid="usd-available">{avail !== null ? formatUsd(avail) : "—"}</strong></div>
+      <p className="budget-note muted small">{live ? "Entered by you. TuitionBridge does not read your bank." : "Fictional test data."}</p>
     </section>
   );
 }
@@ -303,7 +304,7 @@ function Login({ config, onDone }: { config: Config | null; onDone: (csrf: strin
           <p className="hint">
             {registering ? "Already registered? " : "New here? "}
             <button className="link" type="button" onClick={() => { setMode(registering ? "signin" : "register"); setErr(null); }} data-testid="toggle-register">{registering ? "Sign in" : "Create an account"}</button>
-            . Your data stays in a local database on this computer.
+            . Your data stays on this computer.
           </p>
         )}
         {!live && <p className="hint">Sandbox test accounts are documented in the README. Everything here is fictional and payments are simulated.</p>}

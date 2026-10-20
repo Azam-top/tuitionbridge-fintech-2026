@@ -19,14 +19,15 @@ describe("diagnose", () => {
     const p = diagnose(view("BLOCKED", null, [ev({ text: "Provider quotes: Wise could not be reached. No quote was stored; enter an offer by hand or retry." }), noOffers]))!;
     expect(p.kind).toBe("wise");
     expect(p.title).toMatch(/Wise quotes could not be loaded/);
-    expect(p.reason).toContain("Wise could not be reached");
-    expect(p.reason).toMatch(/Nothing was invented/);
+    expect(p.reason).toContain("Wise could not be reached right now");
+    expect(p.reason).not.toMatch(/stored|invented|No quote/);
     expect(p.actions).toEqual(["retry", "manual"]);
-    expect(p.nothingPaid).toBe(true);
   });
   it("treats 'no usable option' and 'switched off' as Wise problems too, but not a successful fetch", () => {
     for (const n of ["Wise did not return a USD to KZT quote for this amount.", "Wise returned no usable USD to KZT option for this amount.", "Live Wise quotes are switched off (APP_WISE_QUOTES=1 enables them)."]) {
-      expect(diagnose(view("BLOCKED", null, [ev({ text: `Provider quotes: ${n}` }), noOffers]))!.kind).toBe("wise");
+      const p = diagnose(view("BLOCKED", null, [ev({ text: `Provider quotes: ${n}` }), noOffers]))!;
+      expect(p.kind).toBe("wise");
+      expect(p.reason).not.toMatch(/APP_WISE|USD to KZT/); // no setting names or internal wording
     }
     const ok = diagnose(view("BLOCKED", null, [ev({ text: "Provider quotes: Fetched 3 Wise option(s)." }), noOffers]))!;
     expect(ok.kind).toBe("no-offers"); // quotes were fetched but none is valid now
@@ -34,12 +35,16 @@ describe("diagnose", () => {
   it("explains a model failure and a rate limit, without inventing a cause", () => {
     const a = diagnose(view("FAILED", "PROVIDER_FAILURE: Groq did not answer within 60 s."))!;
     expect(a).toMatchObject({ kind: "model", title: "The AI assistant could not finish", actions: ["retry"] });
-    expect(a.reason).toContain("did not answer within 60 s");
+    expect(a.reason).toMatch(/did not answer in time/);
+    expect(a.reason).not.toMatch(/Groq|gpt|model/i); // no provider or model names on the main screens
     const b = diagnose(view("FAILED", "PROVIDER_FAILURE: Groq rate limit (HTTP 429)."))!;
     expect(b.reason).toMatch(/Wait a minute/);
+    expect(diagnose(view("FAILED", "PROVIDER_FAILURE: Model provider returned HTTP 500."))!.reason).toMatch(/error \(500\)/);
   });
   it("explains a hit safety limit and an unexpected stop", () => {
-    expect(diagnose(view("FAILED", "LIMIT_REACHED: Model request limit reached (8/10)."))!.kind).toBe("limit");
+    const lim = diagnose(view("FAILED", "LIMIT_REACHED: Model request limit reached (8/10)."))!;
+    expect(lim.kind).toBe("limit");
+    expect(lim.reason).not.toMatch(/\d+\/\d+|model/i);
     expect(diagnose(view("FAILED", "INTERNAL: unexpected error"))!.kind).toBe("other");
   });
   it("stays silent for a blocked task whose reasons are already in the summary (no feasible route)", () => {

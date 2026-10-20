@@ -4,7 +4,8 @@ import { api, ApiFailure, type Balances, type Proposal, type Receipt, type Route
 import { Card, Chip, Details, Row } from "./components";
 import { Icon } from "./icons";
 import { ProtectedBudget, RoutePicker } from "./Routes";
-import { InstructionCard, PROVENANCE_LABEL } from "./LivePanels";
+import { InstructionCard } from "./LivePanels";
+import { providerParts, sourceDetail } from "./plan";
 import { fmtRelative, fmtTime, formatKzt, formatUsd } from "./format";
 
 /** Everything that follows the plan in the main column: routes, budget, review card, instruction/receipt, technical details. */
@@ -18,7 +19,7 @@ export function TaskPanel({ view, live, now, nowMs, approvalMinutes, limits, rou
   return (
     <div className="stack" data-testid="task-panel" data-task-state={task.state}>
       {receipt && <ReceiptCard receipt={receipt} />}
-      {instruction && <InstructionCard instruction={instruction} onChanged={onChanged} onError={onError} />}
+      {instruction && <InstructionCard instruction={instruction} nowMs={nowMs} onChanged={onChanged} onError={onError} />}
       {routes.length > 0 && <RoutePicker routes={routes} best={best} proposal={proposal} nowMs={nowMs} now={now} live={live} selectedId={selectedId} onSelect={onSelect} />}
       {routes.length > 0 && balances && (
         <ProtectedBudget
@@ -30,10 +31,10 @@ export function TaskPanel({ view, live, now, nowMs, approvalMinutes, limits, rou
       {task.state === "AWAITING_APPROVAL" && proposal && <ApprovalCard taskId={task.id} proposal={proposal} live={live} now={now} nowMs={nowMs} approvalMinutes={approvalMinutes} onChanged={onChanged} onError={onError} />}
 
       <details className="card tech" data-testid="tech-panel">
-        <summary>Technical details: tool trace, usage and fingerprints</summary>
+        <summary>Technical details</summary>
         <p className="muted small">
-          Agent mode: <strong>{task.mode}</strong>{task.model ? ` (${task.model})` : ""}; payments: <strong>{live ? "NOT MOVED BY APP" : "SIMULATED"}</strong>.
-          {task.mode === "MOCK" && " This run used the deterministic stand-in, not a live model."}
+          Assistant: <strong>{task.mode}</strong>{task.model ? ` (${task.model})` : ""}; payments: <strong>{live ? "not moved by the app" : "simulated"}</strong>.
+          {task.mode === "MOCK" && " This run used the deterministic sandbox stand-in, not a live model."}
         </p>
         <Usage task={task} limits={limits} />
         <Timeline events={events} />
@@ -80,51 +81,53 @@ function ApprovalCard({ taskId, proposal, live, now, nowMs, approvalMinutes, onC
   }
 
   return (
-    <Card id="approval" title="Review and approve this exact payment" aside={<Chip tone="warn">Nothing has been paid yet</Chip>} className="enter">
-      <div ref={heading} tabIndex={-1} className="focus-target" aria-label="Approval required: review the transaction below" />
+    <Card id="approval" title="Review and approve" aside={<Chip tone={expired ? "bad" : "warn"}>{expired ? "Offer expired" : "Not paid yet"}</Chip>} className="enter">
+      <div ref={heading} tabIndex={-1} className="focus-target" aria-label="Approval required: review the details below" />
+      {expired && <p className="alert" role="alert" data-testid="approval-expired"><Icon name="clock" size={18} /> This offer has expired, so it cannot be approved. Plan again for a current price.</p>}
       <div className="approval-grid" data-testid="approval-card">
         <section className="sect" aria-labelledby="ap-rec">
           <h3 id="ap-rec">Recipient</h3>
           <dl className="rows">
-            <Row label="Recipient">{p.beneficiaryName}</Row>
-            <Row label="Recipient registry ID">{p.recipientRegistryId}</Row>
-            <Row label="Recipient account reference"><code data-testid="approval-account">{p.beneficiaryAccount}</code></Row>
+            <Row label="Name">{p.beneficiaryName}</Row>
+            <Row label="Account"><code data-testid="approval-account">{p.beneficiaryAccount}</code></Row>
             <Row label="Invoice">{p.invoiceReference}</Row>
+            {!live && p.recipientRegistryId && <Row label="Registry ID">{p.recipientRegistryId}</Row>}
           </dl>
         </section>
         <section className="sect" aria-labelledby="ap-amt">
           <h3 id="ap-amt">Amounts</h3>
           <dl className="rows">
-            <Row label="Recipient will receive" strong testId="will-receive"><span className="num">{formatKzt(p.recipientTiyn)}</span>{p.surplusTiyn !== "0" && <small className="muted"> (includes {formatKzt(p.surplusTiyn)} rounding surplus)</small>}</Row>
-            <Row label="Tuition due"><span className="num">{formatKzt(p.tuitionTiyn)}</span></Row>
-            <Row label={live ? "Route" : "Route (simulated provider)"}>{p.providerName}</Row>
-            <Row label="Where this offer came from" testId="offer-source">{PROVENANCE_LABEL[p.quoteProvenance] ?? p.quoteProvenance}{p.quoteObservedAt ? `, seen ${fmtTime(p.quoteObservedAt)}` : ""}{p.quoteSourceNote ? `: ${p.quoteSourceNote}` : ""}</Row>
-            <Row label={p.amountBasis ? "Rate shown by the provider (rounded, display only)" : "Rate (KZT per USD)"}><span className="num">{p.rate}</span></Row>
-            <Row label="USD to be converted"><span className="num">{formatUsd(p.principalCents)}</span></Row>
-            <Row label="Provider fee (fixed, USD)"><span className="num">{formatUsd(p.feeCents)}</span></Row>
-            <Row label="Total to be debited from your USD balance" strong testId="will-debit"><span className="num">{formatUsd(p.totalDebitCents)}</span></Row>
-            <Row label="USD balance after payment (expected)"><span className="num">{formatUsd(proposal.display.usdAfterCents)}</span></Row>
-            <Row label="Living-expense reserve kept"><span className="num">{formatUsd(p.reserveCents)}</span></Row>
+            <Row label="University will receive" strong testId="will-receive"><span className="num">{formatKzt(p.recipientTiyn)}</span>{p.surplusTiyn !== "0" && <small className="muted"> (incl. {formatKzt(p.surplusTiyn)} rounding)</small>}</Row>
+            <Row label="Invoice amount"><span className="num">{formatKzt(p.tuitionTiyn)}</span></Row>
+            <Row label="You pay" strong testId="will-debit"><span className="num">{formatUsd(p.totalDebitCents)}</span> <small className="muted">incl. {formatUsd(p.feeCents)} fee</small></Row>
+            <Row label="Left after payment"><span className="num">{formatUsd(proposal.display.usdAfterCents)}</span></Row>
+            <Row label="Living reserve"><span className="num">{formatUsd(p.reserveCents)}</span></Row>
           </dl>
         </section>
         <section className="sect" aria-labelledby="ap-time">
           <h3 id="ap-time">Timing</h3>
           <dl className="rows">
             <Row label="Invoice deadline" testId="deadline">{fmtTime(p.deadlineAt)}</Row>
-            <Row label="Estimated arrival (an estimate, not a guarantee)">{fmtTime(p.estArrivalAt)}</Row>
-            <Row label={live ? "Offer valid until" : "Quote expires"} testId="quote-expiry">{fmtTime(p.quoteExpiresAt)} <small className="muted">({fmtRelative(p.quoteExpiresAt, now)})</small></Row>
-            <Row label="Your approval stays valid for" testId="approval-expiry">{approvalMinutes} minutes after you approve, and never beyond the quote expiry</Row>
+            <Row label="Expected arrival">{fmtTime(p.estArrivalAt)}</Row>
+            <Row label="Offer valid until" testId="quote-expiry">{fmtTime(p.quoteExpiresAt)} {!expired && <small className="muted">({fmtRelative(p.quoteExpiresAt, now)})</small>}</Row>
+            <Row label="Approval window" testId="approval-expiry">{approvalMinutes} min after you approve, never beyond the offer</Row>
           </dl>
         </section>
       </div>
-      {expired && <p className="alert" role="alert"><Icon name="clock" size={18} /> The quote has expired, so it cannot be approved. Re-plan for fresh numbers.</p>}
-      <p className="hint">Approving binds exactly the figures above. If anything changes, a new proposal and a new approval are required. Only you can approve; the agent cannot.</p>
+      <p className="hint">Approving locks exactly these figures. Only you can approve.</p>
       <div className="actions">
-        <button className="btn btn-primary btn-lg" onClick={approve} disabled={busy || expired} data-testid="approve-btn">{live ? "Approve and issue payment instruction" : "Approve and pay (simulated)"}</button>
+        <button className="btn btn-primary btn-lg" onClick={approve} disabled={busy || expired} data-testid="approve-btn">{live ? "Approve and get instructions" : "Approve and pay (simulated)"}</button>
         <button className="btn btn-lg" onClick={reject} disabled={busy} data-testid="reject-btn">Reject</button>
       </div>
-      <details className="inline-details">
-        <summary>Proposal fingerprint (SHA-256)</summary>
+      <details className="inline-details" data-testid="approval-details">
+        <summary>Details</summary>
+        <dl className="rows">
+          <Row label="Route">{providerParts(p.providerName).title}{providerParts(p.providerName).method ? ` · ${providerParts(p.providerName).method}` : ""}</Row>
+          <Row label="Source" testId="offer-source">{sourceDetail(p.quoteProvenance, p.quoteSourceNote, p.quoteObservedAt)}</Row>
+          <Row label="Converted amount"><span className="num">{formatUsd(p.principalCents)}</span></Row>
+          <Row label="Rate shown"><span className="num">{p.rate} KZT per USD</span></Row>
+        </dl>
+        <p className="muted small">Fingerprint of these figures:</p>
         <code className="hash" data-testid="proposal-hash">{proposal.hash}</code>
       </details>
     </Card>
@@ -146,9 +149,14 @@ function ReceiptCard({ receipt: r }: { receipt: Receipt }) {
         <Row label="Beneficiary">{r.beneficiaryName} · <code>{r.beneficiaryAccount}</code></Row>
         <Row label="Provider / rate / fee">{r.provider} · {r.rate} KZT per USD · {formatUsd(r.feeCents)}</Row>
         <Row label="Rounding">{r.roundingNote}</Row>
-        <Row label="Approval ID"><code>{r.approvalId}</code></Row>
-        <Row label="Proposal fingerprint (SHA-256)"><code className="hash">{r.proposalHash}</code></Row>
       </dl>
+      <details className="inline-details">
+        <summary>Details</summary>
+        <dl className="rows">
+          <Row label="Approval ID"><code>{r.approvalId}</code></Row>
+          <Row label="Fingerprint"><code className="hash">{r.proposalHash}</code></Row>
+        </dl>
+      </details>
     </Card>
   );
 }
@@ -156,7 +164,7 @@ function ReceiptCard({ receipt: r }: { receipt: Receipt }) {
 function Timeline({ events }: { events: TaskView["events"] }) {
   return (
     <>
-      <h3>What the agent did (actual tool events)</h3>
+      <h3>What the assistant did</h3>
       <ol className="timeline" data-testid="timeline">
         {events.map((e) => (
           <li key={e.seq} className={`ev ev-${e.kind}${e.ok === false ? " ev-fail" : ""}`}>

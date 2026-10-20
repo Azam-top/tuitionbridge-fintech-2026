@@ -45,6 +45,7 @@ export interface Recipient { id: string; name: string; account: string; origin: 
 export interface Offer {
   id: string; providerName: string; provenance: string; rate: string; feeCents: string; expiresAt: string; estArrivalAt: string;
   observedAt: string | null; sourceNote: string | null; expired: boolean; deviationBps: number | null;
+  totalDebitCents: string | null; recipientTiyn: string | null;
 }
 export interface Reference { source: "NBK"; pair: string; rate: string; quantity: string; effectiveDate: string; retrievedAt: string; url: string; bodySha256: string; stale: boolean }
 export interface EvidenceItem { id: string; kind: "user_marked_paid" | "bank_confirmation_upload"; label: string; reference: string | null; filename: string | null; mime: string | null; sizeBytes: number | null; sha256: string | null; createdAt: string }

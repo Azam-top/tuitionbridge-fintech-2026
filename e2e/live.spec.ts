@@ -54,7 +54,7 @@ async function addOffer(page: Page) {
   await page.getByTestId("offer-seen").fill(local(new Date(Date.now() - 5 * 60_000)));
   await page.getByTestId("offer-note").fill("Bank app quote screen");
   await page.getByTestId("offer-add").click();
-  await expect(page.getByTestId("offer-list")).toContainText("Entered by you");
+  await expect(page.getByTestId("offer-list")).toContainText("Your offer");
 }
 
 test.describe("TuitionBridge LIVE mode (fake local model provider; Wise and NBK off)", () => {
@@ -84,29 +84,30 @@ test.describe("TuitionBridge LIVE mode (fake local model provider; Wise and NBK 
     await expect(page.getByTestId("offers-message")).toHaveCount(0);
     await addOffer(page);
     await page.getByTestId("start-task").click();
-    await expect(page.getByTestId("task-state")).toContainText("Waiting for your approval", { timeout: 20_000 });
-    await expect(page.getByTestId("offer-source")).toContainText("Entered by you");
+    await expect(page.getByTestId("task-state")).toContainText("Ready for your decision", { timeout: 20_000 });
+    await expect(page.getByTestId("offer-source")).toContainText("Your offer");
     await expect(page.getByTestId("offer-source")).toContainText("Bank app quote screen");
     await expect(page.getByTestId("will-debit")).toContainText("USD 1,123.12");
-    await expect(page.getByTestId("approve-btn")).toContainText("issue payment instruction");
-    await expect(page.getByTestId("agent-summary")).not.toContainText(/completed|executed|payment made/i);
-    await expect(page.getByTestId("agent-summary")).toContainText("Nothing has been paid yet");
+    await expect(page.getByTestId("approve-btn")).toContainText("get instructions");
+    await expect(page.getByTestId("planner")).not.toContainText(/completed|executed|payment made|paid successfully/i);
+    await expect(page.getByTestId("recommendation")).toContainText("Best option: Test Bank");
+    await expect(page.getByTestId("recommendation-reason")).toContainText("arrives by your deadline");
     await page.getByTestId("approve-btn").dblclick();
-    await expect(page.getByTestId("task-state")).toContainText("Approved: instruction issued", { timeout: 20_000 });
+    await expect(page.getByTestId("task-state")).toContainText("Instruction ready", { timeout: 20_000 });
     // no simulated receipt and no ledger movement in the live mode
     await expect(page.getByTestId("receipt")).toHaveCount(0);
     await expect(page.getByTestId("usd-balance")).toContainText("USD 1,500.00");
     await expect(page.getByTestId("instruction-card")).toBeVisible();
-    await expect(page.getByTestId("instruction-status")).toContainText("has not moved any money");
+    await expect(page.getByTestId("instruction-status")).toContainText("Not paid yet");
     await expect(page.getByTestId("instruction-account")).toHaveText(IBAN);
     await expect(page.getByTestId("instruction-total")).toContainText("USD 1,123.12");
     await expect(page.getByTestId("start-task")).toBeDisabled(); // the invoice is locked
     // the user's own statement and an uploaded file are stored but never called verification
     await page.getByTestId("mark-paid").click();
-    await expect(page.getByTestId("instruction-status")).toContainText("not verified by a bank");
+    await expect(page.getByTestId("instruction-status")).toContainText("A bank has not confirmed it");
     await page.getByTestId("upload-confirmation").setInputFiles({ name: "confirmation.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4\n% e2e confirmation\n%%EOF\n") });
-    await expect(page.getByTestId("instruction-status")).toContainText("stored, not verified");
-    await expect(page.getByTestId("evidence-list")).toContainText("did not verify");
+    await expect(page.getByTestId("instruction-status")).toContainText("A bank has not confirmed it");
+    await expect(page.getByTestId("evidence-list")).toContainText("A bank has not confirmed it");
     await expect(page.getByTestId("evidence-list")).not.toContainText(/confirmed by (the )?bank|bank[- ]confirmed/i);
   });
 
@@ -134,8 +135,8 @@ test.describe("TuitionBridge LIVE mode (fake local model provider; Wise and NBK 
     await page.getByTestId("invoice-create").click();
     await expect(page.getByTestId("invoice-fields")).toBeVisible();
     // edit the account to one nobody attested, then confirm -> blocked with the live explanation
-    await page.getByRole("button", { name: "Edit / correct" }).click();
-    await page.getByLabel("Beneficiary account").fill(makeIban("999KZT0000000009"));
+    await page.getByRole("button", { name: "Edit", exact: true }).click();
+    await page.getByLabel("Recipient account").fill(makeIban("999KZT0000000009"));
     await page.getByRole("button", { name: "Save corrections" }).click();
     await page.getByTestId("confirm-invoice").click();
     await expect(page.getByTestId("invoice-issues")).toContainText("attested");
@@ -146,7 +147,7 @@ test.describe("TuitionBridge LIVE mode (fake local model provider; Wise and NBK 
     await register(page);
     await setup(page);
     await invoice(page);
-    await expect(page.getByTestId("no-offers")).toContainText("never invents");
+    await expect(page.getByTestId("no-offers")).toContainText("No options yet");
     await expect(page.getByTestId("planner-no-offers")).toContainText("no payment options yet");
     await expect(page.getByTestId("start-task")).toBeDisabled();
     await expect(page.getByTestId("approval-card")).toHaveCount(0);
@@ -172,7 +173,7 @@ test.describe("LIVE mode, the ordinary user path (fake local model; Wise and NBK
     await expect(page.getByTestId("funds")).toContainText("Saved default: USD 300.00");
     await expect(page.getByTestId("usd-available")).toContainText("USD 1,300.00");
     await page.getByTestId("start-task").click();
-    await expect(page.getByTestId("task-state")).toContainText("Waiting for your approval", { timeout: 20_000 });
+    await expect(page.getByTestId("task-state")).toContainText("Ready for your decision", { timeout: 20_000 });
     // after planning: the server's own reserve for this plan, repeated in the intent, the budget bar and the funds strip
     await expect(page.getByTestId("intent")).toContainText("USD 200.00");
     await expect(page.getByTestId("budget-card")).toContainText("USD 200.00");
@@ -184,11 +185,12 @@ test.describe("LIVE mode, the ordinary user path (fake local model; Wise and NBK
   test("the planner shows the assistant's explanation, and the model name and token counters stay in the technical details", async ({ page }) => {
     await ready(page);
     await page.getByTestId("start-task").click();
-    await expect(page.getByTestId("task-state")).toContainText("Waiting for your approval", { timeout: 20_000 });
+    await expect(page.getByTestId("task-state")).toContainText("Ready for your decision", { timeout: 20_000 });
     await expect(page.getByTestId("recommendation")).toBeVisible();
-    await expect(page.getByTestId("assistant-explanation")).toContainText("Explained by the AI assistant");
+    await page.getByTestId("why-details").locator("summary").click();
+    await expect(page.getByTestId("assistant-explanation")).toContainText("Written by the AI assistant");
     await expect(page.getByTestId("assistant-explanation")).toContainText("The proposal is ready for your review");
-    await expect(page.getByTestId("assistant-explanation")).toContainText("The server, not the assistant, ranked the routes");
+    await expect(page.getByTestId("assistant-explanation")).toContainText("Amounts and ranking come from the server");
     await expect(page.getByTestId("usage")).toBeHidden(); // tokens, requests and latency are collapsed
     await expect(page.getByTestId("task-panel")).not.toContainText("MOCK");
     await page.getByTestId("tech-panel").locator(":scope > summary").click();
@@ -202,9 +204,8 @@ test.describe("LIVE mode, the ordinary user path (fake local model; Wise and NBK
     await page.getByTestId("start-task").click();
     await expect(page.getByTestId("problem")).toBeVisible({ timeout: 30_000 });
     await expect(page.getByTestId("problem")).toContainText("The AI assistant could not finish");
-    await expect(page.getByTestId("task-error")).toContainText("HTTP 500");
-    await expect(page.getByTestId("problem")).toContainText("Nothing was paid");
-    await expect(page.getByTestId("task-state")).toContainText("Failed");
+    await expect(page.getByTestId("task-error")).toContainText("error (500)");
+    await expect(page.getByTestId("task-state")).toContainText("Plan stopped");
     // no stand-in result and no proposal appeared
     await expect(page.getByTestId("approval-card")).toHaveCount(0);
     await expect(page.getByTestId("recommendation")).toHaveCount(0);
@@ -212,14 +213,14 @@ test.describe("LIVE mode, the ordinary user path (fake local model; Wise and NBK
     // fix the cause (here: the marker that makes the fake provider fail) and retry from the same screen
     await page.getByTestId("instruction").fill("Pay this invoice by its deadline, use the cheapest feasible route, and keep USD 300 for living costs.");
     await page.getByTestId("retry-plan").click();
-    await expect(page.getByTestId("task-state")).toContainText("Waiting for your approval", { timeout: 30_000 });
+    await expect(page.getByTestId("task-state")).toContainText("Ready for your decision", { timeout: 30_000 });
     await expect(page.getByTestId("problem")).toHaveCount(0);
   });
 
   test("after approval the Wise button opens one fixed address (shown only for a Wise offer)", async ({ page }) => {
     await ready(page);
     await page.getByTestId("start-task").click();
-    await expect(page.getByTestId("task-state")).toContainText("Waiting for your approval", { timeout: 20_000 });
+    await expect(page.getByTestId("task-state")).toContainText("Ready for your decision", { timeout: 20_000 });
     await page.getByTestId("approve-btn").click();
     await expect(page.getByTestId("instruction-card")).toBeVisible({ timeout: 20_000 });
     // the offer here was typed by the user, so there is no Wise hand-off
@@ -234,10 +235,11 @@ test.describe("LIVE mode, the ordinary user path (fake local model; Wise and NBK
     await page.reload();
     const go = page.getByTestId("go-to-wise");
     await expect(go).toBeVisible();
+    await expect(go).toContainText("Continue on Wise");
     await expect(go).toHaveAttribute("href", "https://wise.com/");
     await expect(go).toHaveAttribute("target", "_blank");
     await expect(go).toHaveAttribute("rel", /noopener/);
-    await expect(page.getByTestId("wise-handoff")).toContainText("Finish the payment on Wise");
+    await expect(page.getByTestId("wise-handoff")).toContainText("Complete your payment on Wise");
     // no other link on the card is taken from the instruction text
     await expect(page.getByTestId("instruction-card").locator("a")).toHaveCount(1);
   });

@@ -3,28 +3,28 @@ import { api, ApiFailure, type Config, type Instruction, type Invoice, type Offe
 import { Card, Chip, Row } from "./components";
 import { fmtTime, formatKzt, formatUsd, kztToTiyn, tiynToInput } from "./format";
 import { Icon } from "./icons";
+import { clockTime, providerParts, sourceDetail, SOURCE_NAME } from "./plan";
 
-/** The one fixed address the "Go to Wise" button opens. It is a constant: no offer, invoice or model text can change it. */
+/** The one fixed address the "Continue on Wise" button opens. It is a constant: no offer, invoice or model text can change it. */
 export const WISE_URL = "https://wise.com/";
 
 const fail = (e: unknown, fallback: string) => (e instanceof ApiFailure ? e.message : fallback);
 
-export const PROVENANCE_LABEL: Record<string, string> = {
-  PROVIDER_LIVE: "Provider API (live)", USER_DECLARED: "Entered by you", SIMULATED: "Sandbox test data",
-};
+/** Plain names for where an option came from. The technical wording lives in the closed Details. */
+export const PROVENANCE_LABEL: Record<string, string> = SOURCE_NAME;
 
 export function SetupBanner({ config }: { config: Config | null }) {
   if (!config || config.appMode !== "live" || config.agentStatus !== "NOT_CONFIGURED") return null;
   return (
     <section className="card setup" role="alert" data-testid="setup-banner">
-      <h2>Setup required: no model is configured</h2>
-      <p>The planning agent needs a real language model. This app has no stand-in agent in the live mode, so planning is disabled until you set one up.</p>
+      <h2>Setup required</h2>
+      <p>Planning needs an AI model. Add your key and model name, then restart.</p>
       <ol>
         <li>Copy <code>.env.example</code> to <code>.env</code>.</li>
-        <li>Set <code>APP_LLM_API_KEY</code> (your own key) and <code>APP_LLM_MODEL</code> (a model id from your provider).</li>
+        <li>Fill in <code>APP_LLM_PROVIDER</code>, <code>APP_LLM_API_KEY</code> and <code>APP_LLM_MODEL</code>.</li>
         <li>Restart the app (<code>npm run start</code>).</li>
       </ol>
-      <p className="muted small">Everything else (funds, recipients, invoice, offers) works without a model.</p>
+      <p className="muted small">Funds, university account, invoice and offers work without it.</p>
     </section>
   );
 }
@@ -41,12 +41,12 @@ export function FundsEditor({ balances, locked, onSaved, onError }: { balances: 
   }
   return (
     <details className="card tech" open={empty} data-testid="funds-editor">
-      <summary>Your declared funds{empty ? " (set these first)" : ""}</summary>
+      <summary>Funds and reserve{empty ? " (start here)" : ""}</summary>
       <form className="form" onSubmit={save}>
-        <p className="muted small">Self-reported: the app does not read your bank. The reserve is the USD you keep for living costs. Each plan starts from this amount; you can change it for one plan, and the agent can never lower it.</p>
-        <label className="field"><span>USD available to you</span><input inputMode="decimal" value={bal} onChange={(e) => setBal(e.target.value)} data-testid="funds-balance-input" disabled={locked} /></label>
-        <label className="field"><span>USD to keep for living costs (your default for each plan)</span><input inputMode="decimal" value={res} onChange={(e) => setRes(e.target.value)} data-testid="funds-reserve-input" disabled={locked} /></label>
-        <div className="actions"><button className="btn btn-primary" disabled={busy || locked} data-testid="funds-save">Save declared funds</button>{locked && <span className="muted small">Finish or cancel the active task first.</span>}</div>
+        <p className="muted small">Entered by you; TuitionBridge does not read your bank. Each plan starts from this reserve.</p>
+        <label className="field"><span>USD you have</span><input inputMode="decimal" value={bal} onChange={(e) => setBal(e.target.value)} data-testid="funds-balance-input" disabled={locked} /></label>
+        <label className="field"><span>Living reserve (USD)</span><input inputMode="decimal" value={res} onChange={(e) => setRes(e.target.value)} data-testid="funds-reserve-input" disabled={locked} /></label>
+        <div className="actions"><button className="btn btn-primary" disabled={busy || locked} data-testid="funds-save">Save</button>{locked && <span className="muted small">Finish or cancel the current plan to change this.</span>}</div>
       </form>
     </details>
   );
@@ -58,25 +58,28 @@ export function RecipientsCard({ recipients, onChanged, onError }: { recipients:
   async function add(e: React.FormEvent) {
     e.preventDefault(); setBusy(true);
     try { await api("POST", "/api/recipients", f); setF({ name: "", account: "", sourceUrl: "", sourceNote: "" }); onChanged(); }
-    catch (x) { onError(fail(x, "Could not add the recipient.")); } finally { setBusy(false); }
+    catch (x) { onError(fail(x, "Could not add the university.")); } finally { setBusy(false); }
   }
   return (
     <details className="card tech" open={recipients.length === 0} data-testid="recipients-card">
-      <summary>Trusted recipients ({recipients.length}){recipients.length === 0 ? ": add your university first" : ""}</summary>
+      <summary>University account ({recipients.length}){recipients.length === 0 ? ": add it first" : ""}</summary>
       {recipients.length > 0 && (
         <ul className="plain" data-testid="recipient-list">
           {recipients.map((r) => (
-            <li key={r.id}><strong>{r.name}</strong> · <code>{r.account}</code><br /><span className="muted small">Attested by you from <a href={r.sourceUrl ?? "#"} target="_blank" rel="noreferrer noopener">{r.sourceUrl}</a>: {r.sourceNote}</span></li>
+            <li key={r.id}>
+              <strong>{r.name}</strong> · <code>{r.account}</code>
+              <br /><span className="muted small">Added by you from {r.sourceUrl ? <a href={r.sourceUrl} target="_blank" rel="noreferrer noopener">the official payment page</a> : "the official payment page"}</span>
+            </li>
           ))}
         </ul>
       )}
       <form className="form" onSubmit={add}>
-        <p className="muted small">A recipient becomes trusted only when you add it here from the university's official payment page. An invoice cannot add or change one.</p>
-        <label className="field"><span>Recipient name (exactly as on the official page)</span><input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} data-testid="recipient-name" /></label>
+        <p className="muted small">Copy the name and account from your university's official payment page. Invoices can never change them.</p>
+        <label className="field"><span>Recipient name (as on the official page)</span><input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} data-testid="recipient-name" /></label>
         <label className="field"><span>Account / IBAN</span><input value={f.account} onChange={(e) => setF({ ...f, account: e.target.value })} data-testid="recipient-account" /></label>
         <label className="field"><span>Official page address (https://…)</span><input value={f.sourceUrl} onChange={(e) => setF({ ...f, sourceUrl: e.target.value })} data-testid="recipient-url" /></label>
         <label className="field"><span>Where on that page, and when you copied it</span><input value={f.sourceNote} onChange={(e) => setF({ ...f, sourceNote: e.target.value })} data-testid="recipient-note" /></label>
-        <div className="actions"><button className="btn btn-primary" disabled={busy} data-testid="recipient-add">Add trusted recipient</button></div>
+        <div className="actions"><button className="btn btn-primary" disabled={busy} data-testid="recipient-add">Save university account</button></div>
       </form>
     </details>
   );
@@ -89,7 +92,7 @@ export function NewInvoiceCard({ recipients, defaultOpen = true, onCreated, onEr
     e.preventDefault();
     const rec = recipients.find((r) => r.id === f.recipientId);
     const tiyn = kztToTiyn(f.amount);
-    if (!rec) return onError("Choose a trusted recipient (add one first).");
+    if (!rec) return onError("Choose the university account first (add it above if it is missing).");
     if (!tiyn) return onError("Enter the amount as digits, for example 500000 or 500,000.50.");
     if (!f.due || Number.isNaN(new Date(f.due).getTime())) return onError("Enter the deadline.");
     setBusy(true);
@@ -103,10 +106,10 @@ export function NewInvoiceCard({ recipients, defaultOpen = true, onCreated, onEr
   }
   return (
     <details className="card tech" open={defaultOpen} data-testid="new-invoice">
-      <summary>Enter an invoice by hand</summary>
+      <summary>Enter an invoice</summary>
       <form className="form" onSubmit={create}>
         <label className="field"><span>Invoice reference</span><input value={f.reference} onChange={(e) => setF({ ...f, reference: e.target.value })} data-testid="invoice-ref" /></label>
-        <label className="field"><span>Recipient (from your trusted recipients)</span>
+        <label className="field"><span>University account</span>
           <select value={f.recipientId} onChange={(e) => setF({ ...f, recipientId: e.target.value })} data-testid="invoice-recipient">
             <option value="">Choose…</option>
             {recipients.map((r) => <option key={r.id} value={r.id}>{r.name} · {r.account}</option>)}
@@ -115,20 +118,18 @@ export function NewInvoiceCard({ recipients, defaultOpen = true, onCreated, onEr
         <label className="field"><span>Amount due (KZT)</span><input inputMode="decimal" value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} data-testid="invoice-amount" /></label>
         <label className="field"><span>Payment deadline (your local time)</span><input type="datetime-local" value={f.due} onChange={(e) => setF({ ...f, due: e.target.value })} data-testid="invoice-due" /></label>
         <div className="actions"><button className="btn btn-primary" disabled={busy} data-testid="invoice-create">Create invoice</button></div>
-        <p className="hint">Or use "Add an invoice" below to read a text PDF. Either way you review and confirm every field.</p>
       </form>
     </details>
   );
 }
 
-const bpsText = (b: number | null) => (b === null ? "" : `${b >= 0 ? "+" : ""}${(b / 100).toFixed(2)}% vs NBK reference`);
+const bpsText = (b: number | null) => (b === null ? "" : `${b >= 0 ? "+" : ""}${(b / 100).toFixed(2)}% vs the National Bank reference`);
 
 export function ReferenceLine({ reference }: { reference: Reference | null }) {
-  if (!reference) return <p className="muted small" data-testid="reference-rate">Official NBK reference rate: not retrieved yet.</p>;
+  if (!reference) return <p className="muted small" data-testid="reference-rate">National Bank of Kazakhstan reference rate: not retrieved yet.</p>;
   return (
     <p className="muted small" data-testid="reference-rate">
-      Official reference (National Bank of Kazakhstan): <strong className="num">{reference.rate} KZT per USD</strong>, effective {reference.effectiveDate}, retrieved {fmtTime(reference.retrievedAt)}
-      {reference.stale ? " (stale)" : ""}. A guide only: it is not an offer, a fee or a delivery time.
+      National Bank of Kazakhstan reference: <strong className="num">{reference.rate} KZT per USD</strong>, effective {reference.effectiveDate}{reference.stale ? " (stale)" : ""}. A guide, not an offer.
     </p>
   );
 }
@@ -142,6 +143,31 @@ export function openManualOffer(): void {
   (d.querySelector("input") as HTMLElement | null)?.focus({ preventScroll: true });
 }
 
+function OfferCard({ o }: { o: Offer }) {
+  const { title, method } = providerParts(o.providerName);
+  return (
+    <li className={`offer${o.expired ? " expired" : ""}`}>
+      <div className="offer-top">
+        <span className="offer-name"><strong>{title}</strong>{method && <span className="muted"> · {method}</span>}</span>
+        {o.expired && <Chip tone="bad">Expired</Chip>}
+        <strong className="num offer-total">{o.totalDebitCents ? formatUsd(o.totalDebitCents) : "n/a"}</strong>
+      </div>
+      <dl className="offer-facts">
+        <div><dt>Fee</dt><dd className="num">{formatUsd(o.feeCents)}</dd></div>
+        <div><dt>University gets</dt><dd className="num">{o.recipientTiyn ? formatKzt(o.recipientTiyn) : "n/a"}</dd></div>
+        <div><dt>Arrives</dt><dd>{fmtTime(o.estArrivalAt)}</dd></div>
+        <div><dt>Valid until</dt><dd>{o.expired ? "expired" : clockTime(o.expiresAt)}</dd></div>
+      </dl>
+      <details className="offer-details">
+        <summary>Details</summary>
+        <p className="muted small">{sourceDetail(o.provenance, o.sourceNote, o.observedAt)}</p>
+        <p className="muted small num">Rate shown: {o.rate} KZT per USD{o.deviationBps !== null ? ` · ${bpsText(o.deviationBps)}` : ""}</p>
+        {o.provenance === "USER_DECLARED" && <p className="muted small">You entered this offer; TuitionBridge cannot check it with the bank.</p>}
+      </details>
+    </li>
+  );
+}
+
 export function OffersCard({ invoice, offers, reference, config, onChanged, onError }: {
   invoice: Invoice; offers: Offer[]; reference: Reference | null; config: Config; onChanged: () => void; onError: (m: string) => void;
 }) {
@@ -152,7 +178,7 @@ export function OffersCard({ invoice, offers, reference, config, onChanged, onEr
   const [msg, setMsg] = useState<{ status: string; text: string } | null>(null);
   async function fetchWise() {
     setBusy(true); setMsg(null);
-    try { const r = await api<{ result: { status: string; message: string } }>("POST", `/api/invoices/${invoice.id}/offers/refresh`); setMsg({ status: r.result.status, text: r.result.message }); onChanged(); }
+    try { const r = await api<{ result: { status: string; message: string } }>("POST", `/api/invoices/${invoice.id}/offers/refresh`); setMsg({ status: r.result.status, text: r.result.status === "OK" ? "Quotes updated." : "Could not load Wise quotes. Try again, or add your bank's offer below." }); onChanged(); }
     catch (x) { onError(fail(x, "Could not fetch quotes.")); } finally { setBusy(false); }
   }
   async function add(e: React.FormEvent) {
@@ -163,46 +189,46 @@ export function OffersCard({ invoice, offers, reference, config, onChanged, onEr
       setF({ ...f, providerName: "", rate: "", feeUsd: "", arrivalAt: "", sourceNote: "" }); onChanged();
     } catch (x) { onError(fail(x, "Could not add the offer. Check every field.")); } finally { setBusy(false); }
   }
+  const wiseSeen = offers.filter((o) => o.provenance === "PROVIDER_LIVE" && o.observedAt).map((o) => o.observedAt as string).sort().pop();
   return (
-    <Card id="offers" title="Payment options and their sources">
+    <Card id="offers" title="Transfer options">
       <div data-testid="offers-card">
-        <p className="muted small">{config.wiseQuotes ? "Press “Plan my payment” and the server asks Wise for current quotes by itself. You can also refresh them here." : "Live Wise quotes are switched off in this setup, so offers come only from what you enter below."}</p>
-        <ReferenceLine reference={reference} />
-        <div className="actions">
-          {config.wiseQuotes
-            ? <button className="btn" onClick={fetchWise} disabled={busy} data-testid="fetch-wise"><Icon name={busy ? "clock" : "globe"} size={16} /> {busy ? "Asking Wise…" : offers.length ? "Refresh Wise quotes" : "Get Wise quotes now"}</button>
-            : <span className="muted small">Live Wise quotes are switched off (set APP_WISE_QUOTES=1). You can still enter offers you were given.</span>}
+        <div className="actions offers-bar">
+          {wiseSeen && <span className="muted small" data-testid="offers-updated">Wise · updated {clockTime(wiseSeen)}</span>}
+          {!wiseSeen && config.wiseQuotes && offers.length === 0 && <span className="muted small">Wise quotes load when you plan your payment.</span>}
+          {!config.wiseQuotes && <span className="muted small">Wise quotes are off. Add your bank's offer below.</span>}
+          {config.wiseQuotes && (
+            <button className="btn" onClick={fetchWise} disabled={busy} data-testid="fetch-wise"><Icon name={busy ? "clock" : "globe"} size={16} /> {busy ? "Updating…" : offers.length ? "Refresh quotes" : "Get quotes now"}</button>
+          )}
           {msg && (
             <span role="status" className={msg.status === "OK" ? "small ok-text" : "small warn-text"} data-testid="offers-message">
-              <Icon name={msg.status === "OK" ? "check" : "alert"} size={14} /> {msg.text}{msg.status !== "OK" ? " Source problem: nothing was invented." : ""}
+              <Icon name={msg.status === "OK" ? "check" : "alert"} size={14} /> {msg.text}
             </span>
           )}
         </div>
-        {offers.length === 0 ? <p className="muted" data-testid="no-offers">No offers yet. They appear here once the planner has asked Wise, or when you add one from your bank. The app never invents an offer.</p> : (
-          <ul className="plain" data-testid="offer-list">
-            {offers.map((o) => (
-              <li key={o.id} className={o.expired ? "expired" : ""}>
-                <strong>{o.providerName}</strong> <Chip tone={o.provenance === "PROVIDER_LIVE" ? "info" : "warn"}>{PROVENANCE_LABEL[o.provenance] ?? o.provenance}</Chip> {o.expired && <Chip tone="bad">expired</Chip>}
-                <br /><span className="num">{o.rate} KZT per USD</span> · fee <span className="num">{formatUsd(o.feeCents)}</span> · arrives about {fmtTime(o.estArrivalAt)} · valid until {fmtTime(o.expiresAt)}
-                {o.deviationBps !== null && <span className="muted small"> · {bpsText(o.deviationBps)}</span>}
-                <br /><span className="muted small">{o.sourceNote ?? "source note unknown"}{o.observedAt ? ` (seen ${fmtTime(o.observedAt)})` : " (observation time unknown)"}</span>
-              </li>
-            ))}
+        {offers.length === 0 ? <p className="muted" data-testid="no-offers">No options yet.</p> : (
+          <ul className="plain offer-list" data-testid="offer-list">
+            {offers.map((o) => <OfferCard key={o.id} o={o} />)}
           </ul>
         )}
         <details className="inline-details" id="manual-offer" data-testid="manual-offer">
-          <summary>Optional: add an offer you were given by your bank or provider</summary>
+          <summary>Add an offer from your bank (optional)</summary>
           <form className="form" onSubmit={add}>
-            <label className="field"><span>Provider or bank</span><input value={f.providerName} onChange={(e) => setF({ ...f, providerName: e.target.value })} data-testid="offer-provider" /></label>
+            <label className="field"><span>Bank or provider</span><input value={f.providerName} onChange={(e) => setF({ ...f, providerName: e.target.value })} data-testid="offer-provider" /></label>
             <label className="field"><span>Rate (KZT per 1 USD)</span><input inputMode="decimal" value={f.rate} onChange={(e) => setF({ ...f, rate: e.target.value })} data-testid="offer-rate" /></label>
-            <label className="field"><span>Total fixed fee (USD)</span><input inputMode="decimal" value={f.feeUsd} onChange={(e) => setF({ ...f, feeUsd: e.target.value })} data-testid="offer-fee" /></label>
+            <label className="field"><span>Total fee (USD)</span><input inputMode="decimal" value={f.feeUsd} onChange={(e) => setF({ ...f, feeUsd: e.target.value })} data-testid="offer-fee" /></label>
             <label className="field"><span>Expected arrival (your local time)</span><input type="datetime-local" value={f.arrivalAt} onChange={(e) => setF({ ...f, arrivalAt: e.target.value })} data-testid="offer-arrival" /></label>
             <label className="field"><span>Offer valid until</span><input type="datetime-local" value={f.validUntil} onChange={(e) => setF({ ...f, validUntil: e.target.value })} data-testid="offer-valid" /></label>
             <label className="field"><span>When you saw it</span><input type="datetime-local" value={f.observedAt} onChange={(e) => setF({ ...f, observedAt: e.target.value })} data-testid="offer-seen" /></label>
-            <label className="field"><span>Where it came from (for example: Bank app quote screen)</span><input value={f.sourceNote} onChange={(e) => setF({ ...f, sourceNote: e.target.value })} data-testid="offer-note" /></label>
+            <label className="field"><span>Where it came from (for example: bank app quote screen)</span><input value={f.sourceNote} onChange={(e) => setF({ ...f, sourceNote: e.target.value })} data-testid="offer-note" /></label>
             <div className="actions"><button className="btn btn-primary" disabled={busy} data-testid="offer-add">Add offer</button></div>
-            <p className="hint">If the provider charges a percentage, enter the total fee in USD for this exact amount.</p>
+            <p className="hint">If a percentage fee applies, enter the total fee in USD for this amount.</p>
           </form>
+        </details>
+        <details className="inline-details" data-testid="sources-details">
+          <summary>Sources</summary>
+          <ReferenceLine reference={reference} />
+          <p className="muted small">Wise amounts are exactly as Wise quoted them and can change; they are not guaranteed.</p>
         </details>
       </div>
     </Card>
@@ -215,65 +241,90 @@ const toBase64 = (buf: ArrayBuffer): string => {
   return btoa(s);
 };
 
-export function InstructionCard({ instruction: ins, onChanged, onError }: { instruction: Instruction; onChanged: () => void; onError: (m: string) => void }) {
+const STATUS_LINE: Record<Instruction["progress"], string> = {
+  INSTRUCTION_ISSUED: "Instruction ready. Not paid yet.",
+  MARKED_PAID_BY_USER: "You marked this as paid. A bank has not confirmed it.",
+  CONFIRMATION_FILE_UPLOADED: "You attached a confirmation file. A bank has not confirmed it.",
+  CANCELLED: "Instruction cancelled.",
+};
+
+export function InstructionCard({ instruction: ins, nowMs, onChanged, onError }: { instruction: Instruction; nowMs: number; onChanged: () => void; onError: (m: string) => void }) {
   const [ref, setRef] = useState("");
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const b = ins.body;
   const run = async (fn: () => Promise<unknown>, msg: string) => { setBusy(true); try { await fn(); onChanged(); } catch (x) { onError(fail(x, msg)); } finally { setBusy(false); } };
   const cancelled = ins.status === "CANCELLED";
+  const isWise = b.source.provenance === "PROVIDER_LIVE" && /^wise\b/i.test(b.provider);
+  const expired = Date.parse(b.mustStartPaymentBefore) <= nowMs;
+  const { title: providerTitle } = providerParts(b.provider);
+  const total = formatUsd(b.youPayUsdCents);
+  const steps = [
+    isWise ? "Continue on Wise and start a USD to KZT transfer." : `Open ${providerTitle}, the channel that gave you this offer.`,
+    `Pay exactly ${total} to ${b.payTo.name}, account ${b.payTo.account}, reference ${b.invoiceReference}.`,
+    "Check that the total and the recipient amount match this page. If they differ, or the offer has expired, plan again.",
+    "Keep your confirmation. You can attach it below (optional).",
+  ];
   return (
-    <Card id="instruction-card" title="Payment instruction" aside={<Chip tone={cancelled ? "muted" : "warn"}>{cancelled ? "Cancelled" : "You pay outside the app"}</Chip>}>
+    <Card id="instruction-card" title="Your payment instruction" aside={<Chip tone={cancelled ? "muted" : expired ? "bad" : "warn"}>{cancelled ? "Cancelled" : expired ? "Offer expired" : "Not paid yet"}</Chip>}>
       <div data-testid="instruction-card">
-        <p className="agent-says" data-testid="instruction-status"><strong>Status:</strong> {ins.progressLabel}</p>
+        <p className="agent-says" data-testid="instruction-status">{STATUS_LINE[ins.progress]}</p>
+        {!cancelled && expired && (
+          <p className="alert" role="alert" data-testid="instruction-expired"><Icon name="clock" size={18} /> This offer has expired. Plan again to get a current price before you pay.</p>
+        )}
+        {!cancelled && !expired && isWise && (
+          <div className="handoff" data-testid="wise-handoff">
+            <a className="btn btn-primary btn-lg" href={WISE_URL} target="_blank" rel="noopener noreferrer" data-testid="go-to-wise">
+              Continue on Wise <Icon name="arrowRight" size={18} />
+            </a>
+            <p className="muted small">Complete your payment on Wise.</p>
+          </div>
+        )}
         <dl className="rows">
           <Row label="Pay to">{b.payTo.name}</Row>
           <Row label="Account"><code data-testid="instruction-account">{b.payTo.account}</code></Row>
-          <Row label="Payment reference">{b.invoiceReference}</Row>
-          <Row label="You pay in total" strong><span className="num" data-testid="instruction-total">{formatUsd(b.youPayUsdCents)}</span></Row>
-          <Row label="Of which provider fee"><span className="num">{formatUsd(b.providerFeeUsdCents)}</span></Row>
-          <Row label="Rate"><span className="num">{b.rate} KZT per USD</span></Row>
-          <Row label="University should receive"><span className="num">{formatKzt(b.universityShouldReceiveTiyn)}</span></Row>
-          <Row label="Start paying before (offer validity)">{fmtTime(b.mustStartPaymentBefore)}</Row>
+          <Row label="Reference">{b.invoiceReference}</Row>
+          <Row label="You pay" strong><span className="num" data-testid="instruction-total">{total}</span> <small className="muted">incl. {formatUsd(b.providerFeeUsdCents)} fee</small></Row>
+          <Row label="University will receive"><span className="num">{formatKzt(b.universityShouldReceiveTiyn)}</span></Row>
+          <Row label="Offer valid until">{fmtTime(b.mustStartPaymentBefore)}</Row>
+          <Row label="Expected arrival">{fmtTime(b.estimatedArrival)}</Row>
           <Row label="Invoice deadline">{fmtTime(b.invoiceDeadline)}</Row>
-          <Row label="Estimated arrival (an estimate)">{fmtTime(b.estimatedArrival)}</Row>
-          <Row label="Offer source">{PROVENANCE_LABEL[b.source.provenance] ?? b.source.provenance}{b.source.observedAt ? `, seen ${fmtTime(b.source.observedAt)}` : ""}{b.source.note ? `: ${b.source.note}` : ""}</Row>
         </dl>
-        {!cancelled && b.source.provenance === "PROVIDER_LIVE" && /^wise\b/i.test(b.provider) && (
-          <div className="handoff" data-testid="wise-handoff">
-            <a className="btn btn-primary btn-lg" href={WISE_URL} target="_blank" rel="noopener noreferrer" data-testid="go-to-wise">
-              Go to Wise <Icon name="arrowRight" size={18} />
-            </a>
-            <p className="muted small">Finish the payment on Wise. It opens wise.com in a new tab; this app cannot pay for you.</p>
-          </div>
-        )}
         <h3>What to do</h3>
-        <ol>{b.steps.map((s, i) => <li key={i}>{s}</li>)}</ol>
+        <ol>{steps.map((s, i) => <li key={i}>{s}</li>)}</ol>
         {ins.evidence.length > 0 && (
           <ul className="plain" data-testid="evidence-list">
             {ins.evidence.map((e) => (
-              <li key={e.id}><strong>{e.kind === "user_marked_paid" ? "Marked paid by you" : "Confirmation file"}</strong> · {fmtTime(e.createdAt)}{e.reference ? ` · reference ${e.reference}` : ""}{e.filename ? ` · ${e.filename}` : ""}
-                <br /><span className="muted small">{e.label}{e.sha256 ? ` SHA-256 ${e.sha256.slice(0, 16)}…` : ""}</span></li>
+              <li key={e.id}>
+                <strong>{e.kind === "user_marked_paid" ? "Marked by you" : "Confirmation file"}</strong> · {fmtTime(e.createdAt)}{e.reference ? ` · reference ${e.reference}` : ""}{e.filename ? ` · ${e.filename}` : ""}
+                <br /><span className="muted small">Your own record. A bank has not confirmed it.</span>
+              </li>
             ))}
           </ul>
         )}
         {!cancelled && (
           <div className="actions">
-            <input value={ref} onChange={(e) => setRef(e.target.value)} placeholder="Payment reference from your bank (optional)" aria-label="Payment reference" style={{ maxWidth: 320 }} />
-            <button className="btn" disabled={busy || ins.evidence.some((e) => e.kind === "user_marked_paid")} onClick={() => run(() => api("POST", `/api/instructions/${ins.id}/mark-paid`, ref ? { reference: ref } : {}), "Could not record this.")} data-testid="mark-paid">I paid (mark as paid; not verified)</button>
+            <input value={ref} onChange={(e) => setRef(e.target.value)} placeholder="Payment reference (optional)" aria-label="Payment reference" style={{ maxWidth: 260 }} />
+            <button className="btn" disabled={busy || ins.evidence.some((e) => e.kind === "user_marked_paid")} onClick={() => run(() => api("POST", `/api/instructions/${ins.id}/mark-paid`, ref ? { reference: ref } : {}), "Could not record this.")} data-testid="mark-paid">I've made the payment</button>
             <label className="btn file-btn">
-              Upload bank confirmation (PDF, PNG, JPEG)
+              Attach confirmation
               <input ref={fileRef} type="file" accept="application/pdf,image/png,image/jpeg" hidden data-testid="upload-confirmation" disabled={busy}
                 onChange={(e) => {
                   const file = e.target.files?.[0]; e.target.value = "";
                   if (!file) return;
-                  void run(async () => api("POST", `/api/instructions/${ins.id}/confirmation`, { filename: file.name, dataBase64: toBase64(await file.arrayBuffer()), ...(ref ? { reference: ref } : {}) }), "Could not upload the file.");
+                  void run(async () => api("POST", `/api/instructions/${ins.id}/confirmation`, { filename: file.name, dataBase64: toBase64(await file.arrayBuffer()), ...(ref ? { reference: ref } : {}) }), "Could not attach the file. Use a PDF, PNG or JPEG under 2 MB.");
                 }} />
             </label>
-            {ins.evidence.length === 0 && <button className="btn" disabled={busy} onClick={() => run(() => api("POST", `/api/instructions/${ins.id}/cancel`), "Could not cancel.")} data-testid="cancel-instruction">Cancel this instruction</button>}
+            {ins.evidence.length === 0 && <button className="btn" disabled={busy} onClick={() => run(() => api("POST", `/api/instructions/${ins.id}/cancel`), "Could not cancel.")} data-testid="cancel-instruction">Cancel instruction</button>}
           </div>
         )}
-        <p className="hint">The app does not move money and cannot see your bank. Anything you mark or upload is stored as your own evidence and is never treated as verified.</p>
+        <details className="inline-details" data-testid="instruction-details">
+          <summary>Details</summary>
+          <p className="muted small">{sourceDetail(b.source.provenance, b.source.note, b.source.observedAt)}</p>
+          <p className="muted small num">Rate shown: {b.rate} KZT per USD</p>
+          <p className="muted small">TuitionBridge cannot see your bank. Anything you mark or attach is your own record.</p>
+          <code className="hash">{ins.hash}</code>
+        </details>
       </div>
     </Card>
   );

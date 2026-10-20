@@ -4,10 +4,10 @@ import { Card, Chip, Row } from "./components";
 import { fmtTime, formatKzt, kztToTiyn, tiynToInput, toLocalInput } from "./format";
 
 const STATUS_TEXT: Record<Invoice["status"], { tone: "ok" | "warn" | "bad" | "info"; text: string }> = {
-  DRAFT: { tone: "warn", text: "Needs your confirmation" },
-  BLOCKED: { tone: "bad", text: "Blocked: needs correction" },
-  CONFIRMED: { tone: "ok", text: "Confirmed by you" },
-  INSTRUCTED: { tone: "info", text: "Payment instruction issued" },
+  DRAFT: { tone: "warn", text: "Needs your check" },
+  BLOCKED: { tone: "bad", text: "Needs correction" },
+  CONFIRMED: { tone: "ok", text: "Confirmed" },
+  INSTRUCTED: { tone: "info", text: "Instruction ready" },
   PAID: { tone: "info", text: "Paid (simulated)" },
 };
 
@@ -51,20 +51,17 @@ export function InvoiceCard({ invoice, locked, live, onChanged, onError }: Props
       {!editing ? (
         <>
           <dl className="rows" data-testid="invoice-fields">
-            <Row label="Beneficiary">{invoice.beneficiaryName}</Row>
-            {live
-              ? <Row label="Trusted recipient">{invoice.recipientRegistryId ? "Matched to a recipient you attested" : "Not matched to any recipient you attested"}</Row>
-              : <Row label="Recipient registry ID">{invoice.recipientRegistryId}</Row>}
-            <Row label="Beneficiary account"><code>{invoice.beneficiaryAccount}</code></Row>
+            <Row label="Recipient">{invoice.beneficiaryName}</Row>
+            <Row label="Account"><code>{invoice.beneficiaryAccount}</code></Row>
             <Row label="Amount due" strong>{/^\d+$/.test(invoice.amountKztTiyn) ? formatKzt(invoice.amountKztTiyn) : "(missing)"}</Row>
             <Row label="Deadline">{invoice.dueAt ? fmtTime(invoice.dueAt) : "(missing)"}</Row>
-            <Row label="Source">{invoice.sourceType.replace("_", " ")}</Row>
+            <Row label="Recipient check">{live ? (invoice.recipientRegistryId ? "Matches your saved university account" : "Does not match your saved university account") : (invoice.recipientRegistryId ? `Matches the test registry (${invoice.recipientRegistryId})` : "Not in the test registry")}</Row>
           </dl>
           {invoice.notes && (
             <div className="untrusted" data-testid="invoice-notes">
-              <strong>Document notes (untrusted text; display only):</strong>
+              <strong>Notes in the document (not trusted, shown as plain text):</strong>
               <p>{invoice.notes}</p>
-              <small>Instructions inside documents cannot waive approval, change the beneficiary, or grant any permission.</small>
+              <small>Notes cannot change who gets paid or skip your approval.</small>
             </div>
           )}
           {invoice.issues.length > 0 && (
@@ -74,10 +71,10 @@ export function InvoiceCard({ invoice, locked, live, onChanged, onError }: Props
           )}
           {invoice.status !== "PAID" && invoice.status !== "INSTRUCTED" && (
             <div className="actions">
-              <button className="btn" onClick={() => setEditing(true)} disabled={busy || locked} title={locked ? "Finish or cancel the active task before editing." : undefined}>Edit / correct</button>
+              <button className="btn" onClick={() => setEditing(true)} disabled={busy || locked} title={locked ? "Finish or cancel the current plan before editing." : undefined}>Edit</button>
               {invoice.status !== "CONFIRMED" && (
                 <button className="btn btn-primary" onClick={confirm} disabled={busy || locked} data-testid="confirm-invoice">
-                  {invoice.status === "BLOCKED" ? "Revalidate and confirm" : "These details are correct: confirm"}
+                  {invoice.status === "BLOCKED" ? "Check again and confirm" : "Confirm these details"}
                 </button>
               )}
             </div>
@@ -87,11 +84,11 @@ export function InvoiceCard({ invoice, locked, live, onChanged, onError }: Props
         <form className="form" onSubmit={(e) => { e.preventDefault(); void save(); }}>
           <Field label="Reference" value={f.reference} onChange={(v) => setF({ ...f, reference: v })} />
           {!live && <Field label="Recipient registry ID" value={f.registry} onChange={(v) => setF({ ...f, registry: v })} />}
-          <Field label="Beneficiary name" value={f.name} onChange={(v) => setF({ ...f, name: v })} />
-          <Field label="Beneficiary account" value={f.account} onChange={(v) => setF({ ...f, account: v })} />
+          <Field label="Recipient name" value={f.name} onChange={(v) => setF({ ...f, name: v })} />
+          <Field label="Recipient account" value={f.account} onChange={(v) => setF({ ...f, account: v })} />
           <Field label="Amount due (KZT)" value={f.amount} onChange={(v) => setF({ ...f, amount: v })} inputMode="decimal" />
           <Field label="Deadline (your local time)" type="datetime-local" value={f.due} onChange={(v) => setF({ ...f, due: v })} />
-          <p className="hint">Saving returns the invoice to "needs confirmation". Any earlier proposal or approval is discarded.</p>
+          <p className="hint">After saving, confirm the invoice again.</p>
           <div className="actions">
             <button type="submit" className="btn btn-primary" disabled={busy}>Save corrections</button>
             <button type="button" className="btn" onClick={() => setEditing(false)} disabled={busy}>Cancel</button>
