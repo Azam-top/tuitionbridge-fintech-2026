@@ -36,3 +36,6 @@ The International Track brief: task completion 40%, security and compliance 30%,
 
 **Who did the work and how was AI used?**
 See `AI_USAGE.md`: AI-assisted coding with Claude Code; human review is for the team to complete and is not yet recorded.
+
+**Why is there no SWIFT integration?**
+Because there is no honest way to add one in this project. SWIFT has no public quote or payment API: sending and tracking (gpi) go through a bank that is a SWIFT member, under that bank's contract, and the fees of intermediary banks are usually unknown in advance. An integration we cannot test against a real counterparty would be a mock presented as a feature, which this project refuses to do. What exists today: a bank's SWIFT wire is a valid option when the student types in the offer from their bank (rate, fixed fee, arrival, validity, source and time seen); it is then compared, ranked and bound into the proposal like any other option, with "intermediary bank charges may apply" left as an unknown, never guessed. A real bank or SWIFT-based execution and tracking is future work that needs a partner bank's access.
