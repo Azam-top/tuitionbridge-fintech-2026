@@ -12,3 +12,4 @@ data/test-*
 data/e2e.sqlite*
 .vitest
 dist-submission
+artifacts/demo/*.webm
