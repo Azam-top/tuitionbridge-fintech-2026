@@ -17,7 +17,7 @@ Provider errors: up to 2 bounded retries, then a visible FAILED state with nothi
 
 **Is the live model working? What is real and what is test data?**
 The live mode needs a real model and uses real sources (Wise public quotes, offers the student types, the NBK reference); the sandbox is separate, labeled test data. The live mode does not move money.
-Not verified. The adapter uses the official SDK and is tested against a local fake provider; a bounded smoke test (`npm run smoke:live`) and a five-case live pack with token and time ceilings (`npm run eval:live`, see `docs/LIVE_RUN.md`) are ready but require a configured key and were not run. A report from a fake provider, MOCK, a failed run or a stale source is never shown as a real-model result.
+Partly verified. One bounded real-model smoke test passed on 2026-10-19: Groq `openai/gpt-oss-120b`, a synthetic student, real Wise quotes, the plan confirmed by the script, no payment (details and limits in `docs/LIVE_SMOKE_RESULT.md`). The five-case live evaluation (`npm run eval:live`) and a manual pass with a real invoice have not been run, so the LIVE mode is not fully verified. Browser tests use a local fake provider. A report from a fake provider, MOCK, a failed run or a stale source is never shown as a real-model result.
 
 **What do the evaluation numbers mean?**
 30 fixed cases, deterministic: model-driven cases use the MOCK agent, adversarial and failure cases use scripted models or direct calls. 30/30 pass with 12/12 critical cases and zero unauthorized payments. That is evidence about the server's policy layer, not about real-model behavior. Targets (≥27/30, all critical) are ours, not the organizers'.

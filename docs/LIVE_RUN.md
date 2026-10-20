@@ -7,7 +7,7 @@ The live application needs a real model to plan at all (`APP_LLM_PROVIDER`, `APP
 
 # Running the real-model evaluation (optional, human-triggered)
 
-**Status in this repository: LIVE NOT RUN.** Nothing here has contacted a model provider. The adapter and every guard below were exercised only against a local fake provider and the MOCK agent.
+**Status in this repository: smoke test PASSED once; the live evaluation below is NOT RUN.** On 2026-10-19 one `npm run smoke:live` passed with Groq `openai/gpt-oss-120b` (synthetic student, real Wise quotes, plan confirmed by the script, no payment); see `docs/LIVE_SMOKE_RESULT.md`. The pack below has not contacted a model provider; its guards were exercised only against a local fake provider and the MOCK agent.
 
 A real run spends money on your provider account. It needs your own key and an explicit budget decision. Do not paste the key into a chat or a commit; put it only in a local `.env` (git-ignored) or the shell environment.
 
